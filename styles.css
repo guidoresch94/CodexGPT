@@ -1,0 +1,18 @@
+body { font-family: Arial, sans-serif; background:#f2f7ff; margin:0; }
+.container{ max-width:1200px; margin:0 auto; padding:20px; }
+header{ display:flex; justify-content:space-between; align-items:center; }
+.card{ background:#fff; border:1px solid #d8e0ef; border-radius:10px; padding:14px; margin-top:14px; }
+.row{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.grid3{ display:grid; grid-template-columns: repeat(3,minmax(220px,1fr)); gap:10px; }
+label{ display:flex; flex-direction:column; gap:4px; font-size:13px; }
+input,select{ padding:6px; border:1px solid #c8d2e5; border-radius:6px; }
+.small{ font-size:12px; color:#546; }
+.gantt-row{ margin-bottom:12px; }
+.track{ position:relative; height:28px; border:1px solid #bbb; border-radius:8px; overflow:hidden; }
+.seg{ position:absolute; top:0; bottom:0; }
+.pastillas{ background:#7ee3a8; }
+.fina{ background:#d2d2d2; }
+.load{ background:#ffb74d; opacity:.8; }
+.unload{ background:#64b5f6; opacity:.9; }
+.kpi{ border:1px solid #dde3f1; border-radius:8px; padding:8px; }
+.kpi b{ font-size:20px; }

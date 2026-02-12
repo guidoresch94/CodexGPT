@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Planificador de Camiones de Sal</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1 id="title"></h1>
+        <div class="row">
+          <label id="langLabel" for="lang"></label>
+          <select id="lang">
+            <option value="es">ES</option>
+            <option value="en">EN</option>
+          </select>
+        </div>
+      </header>
+
+      <section class="card">
+        <h2 id="productionTitle"></h2>
+        <div class="grid3">
+          <label><span id="gramsLabel"></span><input id="grams" type="number" step="0.1" value="14.5" /></label>
+          <label><span id="initialInvLabel"></span><input id="initialInv" type="number" step="0.1" value="25" /></label>
+          <label><span id="truckCapLabel"></span><input id="truckCap" type="number" step="0.1" value="25" /></label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 id="machinesTitle"></h2>
+        <div class="row">
+          <label><span id="machineCountLabel"></span><input id="machineCount" type="number" min="0" max="10" value="7" /></label>
+          <label><span id="uniformSpeedLabel"></span><input id="uniformSpeed" type="number" value="120000" /></label>
+        </div>
+        <div id="machinesTable"></div>
+      </section>
+
+      <section class="card">
+        <h2 id="turnsTitle"></h2>
+        <div id="turnsTable"></div>
+      </section>
+
+      <section class="card">
+        <h2 id="ganttTitle"></h2>
+        <div id="gantt"></div>
+      </section>
+
+      <section class="card">
+        <h2 id="invTitle"></h2>
+        <canvas id="invChart" width="1000" height="280"></canvas>
+      </section>
+
+      <section class="card">
+        <h2 id="kpiTitle"></h2>
+        <div id="kpis" class="grid3"></div>
+      </section>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
