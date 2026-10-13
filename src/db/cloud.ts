@@ -1,14 +1,15 @@
 import { liveQuery } from 'dexie'
 import { useSyncExternalStore } from 'react'
-import { db } from './schema'
+import { allTables, db } from './schema'
 import { capability, inArtifact } from '../lib/platform'
-import type { Category, Fund, Recurring, Settings, Transaction } from '../types'
+import type { Category, Fund, Goal, Habit, HabitLog, Idea, Recurring, Settings, Transaction, WeeklyReview } from '../types'
 
 /**
  * Copia en la nube (base de datos privada del artefacto de Claude).
  * IndexedDB sigue siendo el almacén de trabajo; aquí se refleja en documentos:
- *   data/users/<id>/config      → ajustes, categorías, fijos, huchas
+ *   data/users/<id>/config      → ajustes, categorías, fijos, huchas, hábitos, objetivos, ideas, revisiones
  *   data/users/<id>/tx-AAAA-MM  → movimientos de ese mes
+ *   data/users/<id>/hl-AAAA-MM  → registros de hábitos de ese mes
  */
 
 interface DocRef {
@@ -53,21 +54,40 @@ type Bodies = Map<string, Record<string, unknown>>
 const byIdSort = <T extends { id: string }>(a: T[]) => [...a].sort((x, y) => x.id.localeCompare(y.id))
 
 async function localBodies(): Promise<Bodies> {
-  const [settings, categories, transactions, recurrings, funds] = await Promise.all([
+  const [settings, categories, transactions, recurrings, funds, habits, habitLogs, goals, ideas, reviews] = await Promise.all([
     db.settings.toArray(),
     db.categories.toArray(),
     db.transactions.toArray(),
     db.recurrings.toArray(),
     db.funds.toArray(),
+    db.habits.toArray(),
+    db.habitLogs.toArray(),
+    db.goals.toArray(),
+    db.ideas.toArray(),
+    db.reviews.toArray(),
   ])
   const out: Bodies = new Map()
-  out.set('config', { v: 1, settings, categories: byIdSort(categories), recurrings: byIdSort(recurrings), funds: byIdSort(funds) })
-  const months = new Map<string, Transaction[]>()
-  for (const t of transactions) {
-    const m = t.date.slice(0, 7)
-    months.set(m, [...(months.get(m) ?? []), t])
+  out.set('config', {
+    v: 2,
+    settings,
+    categories: byIdSort(categories),
+    recurrings: byIdSort(recurrings),
+    funds: byIdSort(funds),
+    habits: byIdSort(habits),
+    goals: byIdSort(goals),
+    ideas: byIdSort(ideas),
+    reviews: byIdSort(reviews),
+  })
+  const group = <T extends { id: string; date: string }>(prefix: string, list: T[]) => {
+    const months = new Map<string, T[]>()
+    for (const t of list) {
+      const m = t.date.slice(0, 7)
+      months.set(m, [...(months.get(m) ?? []), t])
+    }
+    for (const [m, items] of months) out.set(`${prefix}-${m}`, { items: byIdSort(items) })
   }
-  for (const [m, items] of months) out.set(`tx-${m}`, { items: byIdSort(items) })
+  group('tx', transactions)
+  group('hl', habitLogs)
   return out
 }
 
@@ -98,17 +118,37 @@ export async function pullFromCloud(): Promise<boolean> {
     return false
   }
   const docs = new Map(snap.docs.filter((d) => d.exists).map((d) => [d.id, d.data() ?? {}]))
-  const config = docs.get('config') as { settings?: Settings[]; categories?: Category[]; recurrings?: Recurring[]; funds?: Fund[] } | undefined
+  const config = docs.get('config') as
+    | {
+        settings?: Settings[]
+        categories?: Category[]
+        recurrings?: Recurring[]
+        funds?: Fund[]
+        habits?: Habit[]
+        goals?: Goal[]
+        ideas?: Idea[]
+        reviews?: WeeklyReview[]
+      }
+    | undefined
   if (!config) return false
   const transactions: Transaction[] = []
-  for (const [id, body] of docs) if (id.startsWith('tx-')) transactions.push(...((body.items as Transaction[]) ?? []))
-  await db.transaction('rw', [db.settings, db.categories, db.transactions, db.recurrings, db.funds], async () => {
-    await Promise.all([db.settings.clear(), db.categories.clear(), db.transactions.clear(), db.recurrings.clear(), db.funds.clear()])
+  const habitLogs: HabitLog[] = []
+  for (const [id, body] of docs) {
+    if (id.startsWith('tx-')) transactions.push(...((body.items as Transaction[]) ?? []))
+    if (id.startsWith('hl-')) habitLogs.push(...((body.items as HabitLog[]) ?? []))
+  }
+  await db.transaction('rw', allTables(), async () => {
+    await Promise.all(allTables().map((t) => t.clear()))
     await db.settings.bulkPut(config.settings ?? [])
     await db.categories.bulkPut(config.categories ?? [])
     await db.recurrings.bulkPut(config.recurrings ?? [])
     await db.funds.bulkPut(config.funds ?? [])
+    await db.habits.bulkPut(config.habits ?? [])
+    await db.goals.bulkPut(config.goals ?? [])
+    await db.ideas.bulkPut(config.ideas ?? [])
+    await db.reviews.bulkPut(config.reviews ?? [])
     await db.transactions.bulkPut(transactions)
+    await db.habitLogs.bulkPut(habitLogs)
   })
   for (const [id, body] of await localBodies()) written.set(id, JSON.stringify(body))
   // Documentos de meses que ya no existen localmente se limpiarán en el próximo guardado
@@ -159,7 +199,7 @@ export function startAutoSave() {
   if (!coll) return
   let timer: number | undefined
   let first = true
-  liveQuery(() => Promise.all([db.settings.count(), db.categories.toArray(), db.transactions.toArray(), db.recurrings.toArray(), db.funds.toArray(), db.settings.toArray()])).subscribe(() => {
+  liveQuery(() => Promise.all(allTables().map((t) => t.toArray()))).subscribe(() => {
     if (first) {
       first = false
       void push()

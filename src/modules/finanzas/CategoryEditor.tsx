@@ -22,7 +22,6 @@ export function CategoryEditor({ data, initial, onSaved }: Props) {
   const [type, setType] = useState<CategoryType>(initial?.type ?? 'variable')
   const [budget, setBudget] = useState(initial?.monthlyBudget ? String(initial.monthlyBudget).replace('.', ',') : '')
   const [parentId, setParentId] = useState(initial?.parentId ?? '')
-  const [weeklyPool, setWeeklyPool] = useState(initial?.weeklyPool ?? false)
   const [housing, setHousing] = useState(initial?.housing ?? false)
   const [reduce, setReduce] = useState(initial?.reduce ?? false)
   const [fundId, setFundId] = useState(initial?.fundId ?? '')
@@ -43,7 +42,6 @@ export function CategoryEditor({ data, initial, onSaved }: Props) {
       type,
       monthlyBudget: round2(parseAmount(budget)),
       parentId: parentId || undefined,
-      weeklyPool,
       housing,
       reduce,
       fundId: type === 'ahorro' ? fundId || undefined : undefined,
@@ -134,7 +132,6 @@ export function CategoryEditor({ data, initial, onSaved }: Props) {
 
       {(type === 'variable' || type === 'fijo') && (
         <div className="divide-y divide-slate-100 dark:divide-white/5">
-          <Toggle checked={weeklyPool} onChange={setWeeklyPool} label="Cuenta en la tarjeta semanal" hint="Se descuenta de tu dinero de la semana." />
           <Toggle checked={housing} onChange={setHousing} label="Es gasto de vivienda" hint="Para el % del sueldo en vivienda." />
           <Toggle checked={reduce} onChange={setReduce} label="Hábito a reducir" hint="Se muestra aparte, con el objetivo de llegar a 0." />
         </div>

@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import { useActions } from '../../app/actions'
 import { go } from '../../app/router'
 import type { AppData } from '../../db/hooks'
+import { GastosTabs } from './GastosTabs'
 import { download, transactionsCsv } from '../../db/backup'
 import { monthTxs, net, rootId } from '../../lib/calc'
 import { fmtDayLong, monthKey, today } from '../../lib/dates'
@@ -48,13 +49,14 @@ export function Movimientos({ data, filter }: { data: AppData; filter?: string }
   return (
     <div>
       <PageHeader
-        title="Movimientos"
+        title="Gastos"
         right={
           <button onClick={exportCsv} className="rounded-full p-2 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10" aria-label="Exportar CSV" title="Exportar CSV">
             <Download size={20} />
           </button>
         }
       />
+      <GastosTabs value="movimientos" />
       <MonthSwitcher value={month} onChange={setMonth} />
 
       <div className="mt-3 flex items-center gap-2 rounded-2xl bg-white px-3 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-white/5">

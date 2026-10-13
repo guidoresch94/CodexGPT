@@ -13,7 +13,7 @@ src/app/        App, router por hash, navegación, contexto de acciones (openTx)
 src/db/         schema Dexie, seed (datos reales + ejemplo), hooks (useData), backup JSON/CSV
 src/lib/        dates (lunes), format (€), calc (presupuesto, semana, proyección, huchas, avisos)
 src/components/ UI común: Card, Sheet, ProgressBar, NumPad, Pickers, Toast
-src/modules/    dashboard, finanzas, objetivos, ajustes (fase 2–3: habitos, hogar, ideas)
+src/modules/    dashboard (+ revisión semanal), finanzas, habitos, objetivos (metas: objetivos, huchas, ideas), ajustes
 ```
 
 ## Reglas del dominio
@@ -22,6 +22,9 @@ src/modules/    dashboard, finanzas, objetivos, ajustes (fase 2–3: habitos, ho
 - `transferencia` + `fundId` = aportación a hucha (ahorro).
 - Subcategorías suman en su categoría raíz.
 - Datos de ejemplo marcados con `sample: true` (borrables desde Ajustes).
+- "Para el día a día" = presupuesto de categorías raíz `variable` − gasto; ritmo ideal lineal en el mes (`monthPace`).
+- Puntuación semanal = 70 % hábitos (progreso medio vs objetivo semanal) + 30 % dinero (`moneyScore`).
+- Se publica como artefacto de Claude: `npm run build:artifact` → `dist-artifact/mi-vida.html`; datos en `db` privado (`data/users/<id>`), ver `src/db/cloud.ts`.
 
 ## Comandos
 - `npm run dev` · `npm run build` · `npm run typecheck`

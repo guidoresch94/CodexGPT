@@ -1,23 +1,30 @@
-import { Check, Settings as Gear } from 'lucide-react'
+import { Check, ChevronRight, Settings as Gear } from 'lucide-react'
 import { useMemo } from 'react'
+import { Area, AreaChart, Line, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { go } from '../../app/router'
 import { useActions } from '../../app/actions'
 import { db } from '../../db/schema'
 import type { AppData } from '../../db/hooks'
-import { alerts, fundBalance, monthSummary, recurringStatus, weekly } from '../../lib/calc'
-import { fmtDayLong, fmtDayShort, monthKey, today, weekdayInitial } from '../../lib/dates'
+import { alerts, fundBalance, level, monthPace, monthSummary, recurringStatus, type Alert } from '../../lib/calc'
+import { fmtDayLong, monthKey, today } from '../../lib/dates'
 import { money, money0, pct, uid } from '../../lib/format'
+import { dayTotal, logsByHabit, moneyScore, streakDays, streakWeeks, UNIT_LABEL, weekProgress, weekScore } from '../../lib/habits'
 import { useToast } from '../../components/Toast'
 import { Card, CatIcon, cx, levelText, PageHeader, ProgressBar, SectionTitle } from '../../components/ui'
-import { level } from '../../lib/calc'
+import { ScoreRing } from '../habitos/ScoreRing'
+import { useHabitTap } from '../habitos/useHabitTap'
+import { goalProgress } from '../objetivos/Objetivos'
+import { currentFocus, reviewDue } from './Review'
 
 export function Dashboard({ data }: { data: AppData }) {
   const { settings, transactions, categories, recurrings, catMap, funds } = data
   const key = monthKey(today())
-  const w = useMemo(() => weekly(transactions, catMap, settings), [transactions, catMap, settings])
   const m = useMemo(() => monthSummary(transactions, categories, recurrings, settings, key), [transactions, categories, recurrings, settings, key])
-  const notes = useMemo(() => alerts(transactions, categories, recurrings, settings), [transactions, categories, recurrings, settings])
+  const pace = useMemo(() => monthPace(transactions, categories, key), [transactions, categories, key])
   const pending = useMemo(() => recurringStatus(recurrings, transactions, key).filter((r) => !r.paid), [recurrings, transactions, key])
+  const byH = useMemo(() => logsByHabit(data.habitLogs), [data.habitLogs])
+  const score = weekScore(data.habits, data.habitLogs, moneyScore(pace))
+  const notes = useMemo(() => [...achievements(data, byH, pace.noSpendDays), ...alerts(transactions, categories, recurrings, settings)], [data, byH, pace.noSpendDays, transactions, categories, recurrings, settings])
 
   const top = [...m.byRoot.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3)
   const hour = new Date().getHours()
@@ -35,7 +42,11 @@ export function Dashboard({ data }: { data: AppData }) {
         }
       />
 
-      <WeeklyCard w={w} allowance={settings.weeklyAllowance} />
+      <SpendCard pace={pace} />
+      <FocusCard data={data} />
+
+      <SectionTitle action={<button onClick={() => go('habitos')} className="text-xs text-emerald-600 dark:text-emerald-400">Ver hábitos</button>}>Hábitos de hoy</SectionTitle>
+      <TodayHabits data={data} byH={byH} score={score.score} />
 
       {pending.length > 0 && <PendingList data={data} items={pending} />}
 
@@ -48,15 +59,6 @@ export function Dashboard({ data }: { data: AppData }) {
           <Stat label="Gastos" value={money0(m.spent)} />
           <Stat label="A huchas" value={money0(m.saved)} tone="text-sky-600 dark:text-sky-400" />
         </div>
-        <div className="mt-4">
-          <div className="mb-1 flex justify-between text-xs text-slate-500 dark:text-slate-400">
-            <span>Gastado del presupuesto</span>
-            <span className="tabular-nums">
-              {money0(m.spent)} / {money0(m.budget)}
-            </span>
-          </div>
-          <ProgressBar value={m.spent} max={m.budget} />
-        </div>
         <div className="mt-4 grid grid-cols-2 gap-3">
           <div className="rounded-2xl bg-slate-50 p-3 dark:bg-white/[0.03]">
             <p className="text-[11px] text-slate-500 dark:text-slate-400">Ahorro previsto a fin de mes</p>
@@ -65,9 +67,7 @@ export function Dashboard({ data }: { data: AppData }) {
           </div>
           <div className="rounded-2xl bg-slate-50 p-3 dark:bg-white/[0.03]">
             <p className="text-[11px] text-slate-500 dark:text-slate-400">Sueldo en vivienda</p>
-            <p className={cx('text-lg font-bold tabular-nums', m.housingPct <= settings.housingTarget ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500')}>
-              {pct(m.housingPct)}
-            </p>
+            <p className={cx('text-lg font-bold tabular-nums', m.housingPct <= settings.housingTarget ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500')}>{pct(m.housingPct)}</p>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">Objetivo ≤ {settings.housingTarget} %</p>
           </div>
         </div>
@@ -75,9 +75,9 @@ export function Dashboard({ data }: { data: AppData }) {
 
       {notes.length > 0 && (
         <>
-          <SectionTitle>Avisos</SectionTitle>
+          <SectionTitle>Avisos y logros</SectionTitle>
           <div className="space-y-2">
-            {notes.map((n, i) => (
+            {notes.slice(0, 6).map((n, i) => (
               <div
                 key={i}
                 className={cx(
@@ -121,14 +121,34 @@ export function Dashboard({ data }: { data: AppData }) {
         </>
       )}
 
-      <SectionTitle action={<button onClick={() => go('huchas')} className="text-xs text-emerald-600 dark:text-emerald-400">Ver todas</button>}>Huchas</SectionTitle>
+      <SectionTitle action={<button onClick={() => go('metas')} className="text-xs text-emerald-600 dark:text-emerald-400">Ver metas</button>}>Metas</SectionTitle>
       <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1">
+        {data.goals
+          .filter((g) => g.status === 'activo')
+          .slice(0, 4)
+          .map((g) => {
+            const p = goalProgress(g, data)
+            return (
+              <Card key={g.id} className="w-40 shrink-0" onClick={() => go('metas')}>
+                <div className="text-2xl">{g.icon}</div>
+                <p className="mt-1 line-clamp-2 min-h-[2.5em] text-xs font-medium">{g.title}</p>
+                {p ? (
+                  <div className="mt-2">
+                    <ProgressBar value={p.value} max={p.target} color="#38bdf8" thin />
+                    <p className="mt-1 text-[10px] text-slate-500">{Math.round((p.value / p.target) * 100)} %</p>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-[10px] text-slate-500">Hito pendiente</p>
+                )}
+              </Card>
+            )
+          })}
         {funds
           .filter((f) => !f.archived)
           .map((f) => {
             const b = fundBalance(f, transactions)
             return (
-              <Card key={f.id} className="w-40 shrink-0" onClick={() => go('huchas')}>
+              <Card key={f.id} className="w-40 shrink-0" onClick={() => go('metas', 'huchas')}>
                 <div className="text-2xl">{f.icon}</div>
                 <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{f.name}</p>
                 <p className="text-lg font-bold tabular-nums">{money0(b)}</p>
@@ -155,50 +175,149 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: str
   )
 }
 
-function WeeklyCard({ w, allowance }: { w: ReturnType<typeof weekly>; allowance: number }) {
+/** Lo que te queda para el día a día y la curva del mes frente al ritmo ideal */
+function SpendCard({ pace }: { pace: ReturnType<typeof monthPace> }) {
   const { openTx } = useActions()
-  const max = Math.max(...w.days.map((d) => d.amount), allowance / 7)
-  const now = today()
-  const over = w.remaining < 0
+  const over = pace.remaining < 0
+  const ahead = pace.vsPace >= 0
   return (
-    <Card className="bg-gradient-to-br from-emerald-500/15 via-white to-white dark:from-emerald-500/20 dark:via-slate-900 dark:to-slate-900">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">💳 Tarjeta semanal · te quedan</p>
-          <p className={cx('text-4xl font-bold tabular-nums tracking-tight', over ? 'text-red-500' : 'text-slate-900 dark:text-white')}>{money(w.remaining)}</p>
+    <Card>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Te quedan para el día a día</p>
+          <p className={cx('text-4xl font-bold tabular-nums tracking-tight', over ? 'text-red-500' : 'text-slate-900 dark:text-white')}>{money(pace.remaining)}</p>
           <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">
-            {over ? 'Hasta el lunes, modo ahorro 🙏' : (
+            {over ? 'Te has pasado del presupuesto variable' : (
               <>
-                ≈ <b className="tabular-nums">{money(w.perDayAllowed)}</b>/día · {w.daysLeft} {w.daysLeft === 1 ? 'día' : 'días'}
+                ≈ <b className="tabular-nums">{money(pace.perDayAllowed)}</b>/día · {pace.daysLeft} {pace.daysLeft === 1 ? 'día' : 'días'}
               </>
             )}
           </p>
         </div>
-        <button onClick={() => openTx()} className="rounded-2xl bg-emerald-500 px-3 py-2 text-sm font-semibold text-slate-950 active:scale-95">
+        <button onClick={() => openTx()} className="shrink-0 rounded-2xl bg-emerald-500 px-3 py-2 text-sm font-semibold text-slate-950 active:scale-95">
           + Gasto
         </button>
       </div>
-      <div className="mt-3">
-        <ProgressBar value={w.spent} max={allowance} />
-        <p className="mt-1 text-right text-[11px] text-slate-500 tabular-nums">
-          {money0(w.spent)} de {money0(allowance)}
-        </p>
+      <span className={cx('mt-2 inline-block rounded-full px-2.5 py-1 text-[11px] font-medium', ahead ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : 'bg-amber-500/15 text-amber-700 dark:text-amber-300')}>
+        {ahead ? `▼ ${money0(pace.vsPace)} por debajo del ritmo` : `▲ ${money0(-pace.vsPace)} por encima del ritmo`}
+      </span>
+      <div className="mt-2 h-28">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={pace.series} margin={{ top: 6, right: 4, left: 4, bottom: 0 }}>
+            <defs>
+              <linearGradient id="spendFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <XAxis dataKey="day" tickLine={false} axisLine={false} fontSize={10} stroke="#94a3b8" ticks={[1, 10, 20, pace.series.length]} />
+            <Tooltip
+              contentStyle={{ borderRadius: 12, fontSize: 12 }}
+              labelFormatter={(d) => `Día ${d}`}
+              formatter={(v, n) => [money0(Number(v)), n === 'actual' ? 'Este mes' : n === 'ideal' ? 'Ritmo ideal' : 'Mes pasado']}
+            />
+            <Line type="monotone" dataKey="prev" stroke="#94a3b8" strokeOpacity={0.45} strokeWidth={1.5} dot={false} isAnimationActive={false} />
+            <Line type="linear" dataKey="ideal" stroke="#94a3b8" strokeDasharray="4 4" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+            <Area type="monotone" dataKey="actual" stroke="#10b981" strokeWidth={2} fill="url(#spendFill)" connectNulls={false} isAnimationActive={false} />
+          </AreaChart>
+        </ResponsiveContainer>
       </div>
-      <div className="mt-2 flex items-end gap-1.5">
-        {w.days.map((d) => (
-          <div key={d.date} className="flex flex-1 flex-col items-center gap-1" title={`${fmtDayShort(d.date)}: ${money(d.amount)}`}>
-            <div className="flex h-12 w-full items-end">
-              <div
-                className={cx('w-full rounded-md', d.date === now ? 'bg-emerald-500' : d.date < now ? 'bg-slate-300 dark:bg-white/20' : 'bg-slate-200/60 dark:bg-white/5')}
-                style={{ height: `${Math.max(4, (d.amount / max) * 100)}%` }}
-              />
-            </div>
-            <span className={cx('text-[10px]', d.date === now ? 'font-bold text-emerald-600 dark:text-emerald-400' : 'text-slate-400')}>{weekdayInitial(d.date)}</span>
-          </div>
-        ))}
+      <div className="mt-1 flex flex-wrap gap-x-3 text-[10px] text-slate-500">
+        <span className="flex items-center gap-1"><span className="h-0.5 w-3 bg-emerald-500" /> Este mes</span>
+        <span className="flex items-center gap-1"><span className="h-0 w-3 border-t border-dashed border-slate-400" /> Ritmo ideal ({money0(pace.budget)})</span>
+        <span className="flex items-center gap-1"><span className="h-0.5 w-3 bg-slate-400/50" /> Mes pasado</span>
       </div>
     </Card>
   )
+}
+
+function FocusCard({ data }: { data: AppData }) {
+  const { openReview } = useActions()
+  const { due } = reviewDue(data)
+  const focus = currentFocus(data)
+  if (due)
+    return (
+      <button onClick={openReview} className="mt-3 flex w-full items-center gap-3 rounded-3xl bg-gradient-to-r from-violet-500/20 to-sky-500/10 p-4 text-left ring-1 ring-violet-500/20">
+        <span className="text-2xl">🧭</span>
+        <span className="flex-1">
+          <span className="block text-sm font-semibold">Revisión semanal · 5 min</span>
+          <span className="block text-xs text-slate-600 dark:text-slate-300">Repasa gastos y hábitos y elige tu foco para la semana.</span>
+        </span>
+        <ChevronRight size={18} className="text-slate-400" />
+      </button>
+    )
+  if (!focus?.focus) return null
+  return (
+    <button onClick={openReview} className="mt-3 flex w-full items-center gap-3 rounded-3xl bg-violet-500/10 p-4 text-left">
+      <span className="text-2xl">🎯</span>
+      <span className="flex-1">
+        <span className="block text-[11px] font-medium uppercase tracking-wider text-violet-600 dark:text-violet-300">Foco de la semana</span>
+        <span className="block text-sm font-medium">{focus.focus}</span>
+      </span>
+    </button>
+  )
+}
+
+function TodayHabits({ data, byH, score }: { data: AppData; byH: ReturnType<typeof logsByHabit>; score: number }) {
+  const tap = useHabitTap(data)
+  const now = today()
+  const active = data.habits.filter((h) => h.active)
+  if (!active.length)
+    return (
+      <Card onClick={() => go('habitos')}>
+        <p className="text-sm text-slate-500">Crea tu primer hábito para hacer check-in desde aquí.</p>
+      </Card>
+    )
+  return (
+    <Card className="p-3">
+      <div className="mb-2 flex items-center gap-3 px-1">
+        <ScoreRing value={score} size={44} />
+        <p className="text-xs text-slate-500 dark:text-slate-400">Puntuación de la semana. Toca un hábito para registrarlo.</p>
+      </div>
+      <div className="grid grid-cols-4 gap-2">
+        {active.map((h) => {
+          const logs = byH.get(h.id) ?? []
+          const todayV = dayTotal(h, logs, now)
+          const p = weekProgress(h, logs)
+          const done = todayV > 0
+          return (
+            <button key={h.id} onClick={() => tap(h)} className="flex flex-col items-center gap-1 rounded-2xl p-1.5 active:scale-95">
+              <span className="relative grid h-12 w-12 place-items-center rounded-2xl text-xl transition" style={{ background: done ? h.color : `${h.color}22` }}>
+                {h.icon}
+                {done && (
+                  <span className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-white text-emerald-600 shadow dark:bg-slate-900">
+                    <Check size={11} strokeWidth={3} />
+                  </span>
+                )}
+              </span>
+              <span className="line-clamp-1 text-[10px] text-slate-600 dark:text-slate-300">{h.name}</span>
+              <span className={cx('text-[10px] tabular-nums', p.met ? 'font-semibold text-emerald-600 dark:text-emerald-400' : 'text-slate-400')}>
+                {Math.round(p.done * 10) / 10}/{p.target}
+                {h.unit !== 'veces' && h.unit !== 'si_no' ? ` ${UNIT_LABEL[h.unit]}` : ''}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </Card>
+  )
+}
+
+/** Logros positivos: rachas y días sin gastar */
+function achievements(data: AppData, byH: ReturnType<typeof logsByHabit>, noSpendDays: number): Alert[] {
+  const out: Alert[] = []
+  for (const h of data.habits.filter((x) => x.active)) {
+    const logs = byH.get(h.id) ?? []
+    if (h.unit === 'si_no') {
+      const d = streakDays(h, logs)
+      if (d >= 3) out.push({ tone: 'good', text: `${h.icon} ${d} días seguidos: ${h.name.toLowerCase()} 🔥` })
+    } else {
+      const w = streakWeeks(h, logs)
+      if (w >= 2) out.push({ tone: 'good', text: `${h.icon} ${w} semanas seguidas cumpliendo ${h.name.toLowerCase()} 🔥` })
+    }
+  }
+  if (noSpendDays >= 3) out.push({ tone: 'good', text: `🧘 ${noSpendDays} días sin gastos variables este mes.` })
+  return out.slice(0, 3)
 }
 
 function PendingList({ data, items }: { data: AppData; items: ReturnType<typeof recurringStatus> }) {

@@ -9,7 +9,7 @@ import { money, money0, parseAmount, pct, round2, uid } from '../../lib/format'
 import type { Fund } from '../../types'
 import { ColorPicker, EmojiPicker } from '../../components/Pickers'
 import { useToast } from '../../components/Toast'
-import { Button, Card, CatIcon, Empty, Field, Input, PageHeader, ProgressBar, SectionTitle, Sheet } from '../../components/ui'
+import { Button, Card, CatIcon, Empty, Field, Input, ProgressBar, SectionTitle, Sheet } from '../../components/ui'
 import { TxRow } from '../finanzas/Movimientos'
 
 export function Huchas({ data }: { data: AppData }) {
@@ -22,10 +22,14 @@ export function Huchas({ data }: { data: AppData }) {
 
   return (
     <div>
-      <PageHeader title="Huchas" right={<Button className="flex items-center gap-1 py-2" onClick={() => setEdit({})}><Plus size={16} /> Nueva</Button>} />
-      <Card className="bg-gradient-to-br from-sky-500/15 via-white to-white dark:from-sky-500/20 dark:via-slate-900 dark:to-slate-900">
-        <p className="text-xs text-slate-500 dark:text-slate-400">Total ahorrado</p>
-        <p className="text-3xl font-bold tabular-nums">{money(total)}</p>
+      <Card className="flex items-center justify-between bg-gradient-to-br from-sky-500/15 via-white to-white dark:from-sky-500/20 dark:via-slate-900 dark:to-slate-900">
+        <div>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Total ahorrado</p>
+          <p className="text-3xl font-bold tabular-nums">{money(total)}</p>
+        </div>
+        <Button className="flex items-center gap-1 py-2" onClick={() => setEdit({})}>
+          <Plus size={16} /> Hucha
+        </Button>
       </Card>
 
       <div className="mt-4 space-y-3">

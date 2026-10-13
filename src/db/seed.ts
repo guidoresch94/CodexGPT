@@ -1,6 +1,6 @@
-import { db } from './schema'
-import type { Category, Fund, Recurring, Settings, Transaction } from '../types'
-import { dayInMonth, monthKey, monthRange, shiftMonth, today } from '../lib/dates'
+import { allTables, db } from './schema'
+import type { Category, Fund, Goal, Habit, HabitLog, Idea, Recurring, Settings, Transaction } from '../types'
+import { dayInMonth, monthKey, monthRange, shiftMonth, toISO, today } from '../lib/dates'
 import { round2, uid } from '../lib/format'
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -14,9 +14,10 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'oscuro',
   name: 'Guido',
   paymentMethods: ['Tarjeta', 'Bizum', 'Efectivo', 'Domiciliación'],
+  dataVersion: 2,
 }
 
-type CatSeed = Omit<Category, 'archived' | 'order' | 'weeklyPool'> & { weeklyPool?: boolean }
+type CatSeed = Omit<Category, 'archived' | 'order'>
 
 const CATS: CatSeed[] = [
   { id: 'alquiler', name: 'Alquiler', icon: '🏠', color: '#6366f1', monthlyBudget: 1250, type: 'fijo', housing: true },
@@ -24,11 +25,11 @@ const CATS: CatSeed[] = [
   { id: 'luz', name: 'Luz', icon: '⚡', color: '#fbbf24', monthlyBudget: 0, type: 'fijo', parentId: 'suministros' },
   { id: 'agua', name: 'Agua', icon: '💧', color: '#38bdf8', monthlyBudget: 0, type: 'fijo', parentId: 'suministros' },
   { id: 'internet', name: 'Internet', icon: '🌐', color: '#a78bfa', monthlyBudget: 0, type: 'fijo', parentId: 'suministros' },
-  { id: 'super', name: 'Supermercado', icon: '🛒', color: '#22c55e', monthlyBudget: 300, type: 'variable', weeklyPool: true },
-  { id: 'ocio', name: 'Restaurantes y ocio', icon: '🍻', color: '#f97316', monthlyBudget: 300, type: 'variable', weeklyPool: true },
-  { id: 'bizum', name: 'Bizum amigos', icon: '🤝', color: '#fb923c', monthlyBudget: 0, type: 'variable', weeklyPool: true, parentId: 'ocio' },
-  { id: 'delivery', name: 'Delivery y cafés', icon: '☕', color: '#d97706', monthlyBudget: 35, type: 'variable', weeklyPool: true },
-  { id: 'transporte', name: 'Transporte', icon: '🚲', color: '#06b6d4', monthlyBudget: 30, type: 'variable', weeklyPool: true },
+  { id: 'super', name: 'Supermercado', icon: '🛒', color: '#22c55e', monthlyBudget: 300, type: 'variable' },
+  { id: 'ocio', name: 'Restaurantes y ocio', icon: '🍻', color: '#f97316', monthlyBudget: 300, type: 'variable' },
+  { id: 'bizum', name: 'Bizum amigos', icon: '🤝', color: '#fb923c', monthlyBudget: 0, type: 'variable', parentId: 'ocio' },
+  { id: 'delivery', name: 'Delivery y cafés', icon: '☕', color: '#d97706', monthlyBudget: 35, type: 'variable' },
+  { id: 'transporte', name: 'Transporte', icon: '🚲', color: '#06b6d4', monthlyBudget: 30, type: 'variable' },
   { id: 'deporte', name: 'Deporte', icon: '🏋️', color: '#10b981', monthlyBudget: 75, type: 'fijo' },
   { id: 'compras', name: 'Compras', icon: '🛍️', color: '#ec4899', monthlyBudget: 60, type: 'variable' },
   { id: 'tabaco', name: 'Tabaco', icon: '🚬', color: '#94a3b8', monthlyBudget: 48, type: 'variable', reduce: true },
@@ -122,25 +123,93 @@ function sampleTransactions(): Transaction[] {
   return txs
 }
 
+// ── Hábitos, objetivos e ideas ──────────────────────────────────────────
+
+const HABITS: Habit[] = [
+  { id: 'h-gym', name: 'Gimnasio', icon: '🏋️', color: '#10b981', area: 'Deporte', unit: 'veces', weeklyTarget: 3, linkedCategoryId: 'deporte', active: true, order: 0 },
+  { id: 'h-basket', name: 'Basket con amigos', icon: '🏀', color: '#f97316', area: 'Deporte', unit: 'veces', weeklyTarget: 1, active: true, order: 1 },
+  { id: 'h-padel', name: 'Pádel', icon: '🎾', color: '#a3e635', area: 'Deporte', unit: 'veces', weeklyTarget: 1, active: true, order: 2 },
+  { id: 'h-run', name: 'Running', icon: '🏃', color: '#38bdf8', area: 'Deporte', unit: 'km', weeklyTarget: 15, active: true, order: 3 },
+  { id: 'h-guitar', name: 'Guitarra', icon: '🎸', color: '#a78bfa', area: 'Música', unit: 'min', weeklyTarget: 120, active: true, order: 4 },
+  { id: 'h-read', name: 'Lectura', icon: '📚', color: '#f59e0b', area: 'Cultura', unit: 'paginas', weeklyTarget: 50, active: true, order: 5 },
+  { id: 'h-nosmoke', name: 'Día sin fumar', icon: '🚭', color: '#34d399', area: 'Salud', unit: 'si_no', weeklyTarget: 7, active: true, order: 6 },
+]
+
+const GOALS: Goal[] = [
+  { id: 'g-tabaco', title: 'Dejar el tabaco', icon: '🚭', area: 'Salud', target: 30, current: 0, unit: 'días seguidos', status: 'activo', linkedHabitId: 'h-nosmoke', createdAt: 0 },
+  { id: 'g-moto', title: 'Carnet de moto A2', icon: '🏍️', area: 'Aprendizaje', deadline: '2027-06-30', status: 'activo', createdAt: 0 },
+  { id: 'g-guitarra', title: 'Tocar 3 canciones con la guitarra', icon: '🎸', area: 'Música', target: 3, current: 0, unit: 'canciones', status: 'activo', linkedHabitId: 'h-guitar', createdAt: 0 },
+  { id: 'g-libros', title: 'Leer 12 libros en 2027', icon: '📚', area: 'Cultura', target: 12, current: 0, unit: 'libros', deadline: '2027-12-31', status: 'activo', createdAt: 0 },
+  { id: 'g-emergencia', title: 'Fondo de emergencia completo', icon: '🛟', area: 'Casa', status: 'activo', linkedFundId: 'f-emergencia', createdAt: 0 },
+]
+
+const IDEAS: Idea[] = [
+  { id: 'i-plantas', text: 'Plantas para el balcón del piso nuevo', tag: 'casa', status: 'nueva', cost: 60, createdAt: 0 },
+  { id: 'i-japon', text: 'Viaje a Japón en primavera', tag: 'viaje', status: 'evaluando', cost: 2500, createdAt: 0 },
+  { id: 'i-batch', text: 'Domingos de batch cooking para la semana', tag: 'casa', status: 'nueva', createdAt: 0 },
+]
+
+/** Registros de ejemplo de las últimas 10 semanas, con algo de variación realista */
+function sampleHabitLogs(): HabitLog[] {
+  const rand = rng(7)
+  const logs: HabitLog[] = []
+  const now = new Date()
+  for (let back = 70; back >= 0; back--) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - back)
+    if (back === 0 && now.getHours() < 12) continue
+    const date = toISO(d)
+    const dow = (d.getDay() + 6) % 7 // 0 = lunes
+    const push = (habitId: string, value: number) => logs.push({ id: uid(), habitId, date, value, sample: true })
+    if ([0, 2, 4].includes(dow) && rand() < 0.75) push('h-gym', 1)
+    if (dow === 3 && rand() < 0.8) push('h-basket', 1)
+    if (dow === 5 && rand() < 0.6) push('h-padel', 1)
+    if ([1, 6].includes(dow) && rand() < 0.65) push('h-run', Math.round(5 + rand() * 4))
+    if (rand() < 0.35) push('h-guitar', [15, 20, 30, 45][Math.floor(rand() * 4)])
+    if (rand() < 0.5) push('h-read', Math.round(8 + rand() * 20))
+    if (back < 20 ? rand() < 0.75 : rand() < 0.4) push('h-nosmoke', 1)
+  }
+  return logs
+}
+
 export async function seedIfEmpty() {
   const exists = await db.settings.get('main')
-  if (exists) return
+  if (exists) return ensureV2()
   await seedAll(true)
 }
 
+/** Para quien ya usaba la app: añade hábitos, objetivos e ideas por defecto una sola vez */
+export async function ensureV2() {
+  const s = await db.settings.get('main')
+  if (!s || (s.dataVersion ?? 1) >= 2) return
+  await db.transaction('rw', [db.settings, db.habits, db.goals, db.ideas], async () => {
+    if (!(await db.habits.count())) await db.habits.bulkPut(HABITS)
+    if (!(await db.goals.count())) await db.goals.bulkPut(GOALS.map((g) => ({ ...g, createdAt: Date.now() })))
+    if (!(await db.ideas.count())) await db.ideas.bulkPut(IDEAS.map((i) => ({ ...i, createdAt: Date.now() })))
+    await db.settings.update('main', { dataVersion: 2 })
+  })
+}
+
 export async function seedAll(withSamples: boolean) {
-  await db.transaction('rw', [db.settings, db.categories, db.transactions, db.recurrings, db.funds], async () => {
-    await Promise.all([db.settings.clear(), db.categories.clear(), db.transactions.clear(), db.recurrings.clear(), db.funds.clear()])
+  await db.transaction('rw', allTables(), async () => {
+    await Promise.all(allTables().map((t) => t.clear()))
     await db.settings.put(DEFAULT_SETTINGS)
-    await db.categories.bulkPut(CATS.map((c, i) => ({ weeklyPool: false, ...c, archived: false, order: i })))
+    await db.categories.bulkPut(CATS.map((c, i) => ({ ...c, archived: false, order: i })))
     await db.funds.bulkPut(FUNDS)
     await db.recurrings.bulkPut(RECURRINGS)
-    if (withSamples) await db.transactions.bulkPut(sampleTransactions())
+    await db.habits.bulkPut(HABITS)
+    await db.goals.bulkPut(GOALS.map((g) => ({ ...g, createdAt: Date.now() })))
+    await db.ideas.bulkPut(IDEAS.map((i) => ({ ...i, createdAt: Date.now() })))
+    if (withSamples) {
+      await db.transactions.bulkPut(sampleTransactions())
+      await db.habitLogs.bulkPut(sampleHabitLogs())
+    }
   })
 }
 
 export async function clearSamples() {
   const ids = (await db.transactions.toArray()).filter((t) => t.sample).map((t) => t.id)
+  const logIds = (await db.habitLogs.toArray()).filter((l) => l.sample).map((l) => l.id)
   await db.transactions.bulkDelete(ids)
-  return ids.length
+  await db.habitLogs.bulkDelete(logIds)
+  return ids.length + logIds.length
 }

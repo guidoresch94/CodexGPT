@@ -13,8 +13,8 @@ export interface Category {
   parentId?: ID
   monthlyBudget: number
   type: CategoryType
-  /** Cuenta para la "tarjeta de gasto semanal" */
-  weeklyPool: boolean
+  /** Obsoleto (antigua tarjeta semanal). Se conserva por compatibilidad. */
+  weeklyPool?: boolean
   /** Cuenta para el % del sueldo en vivienda */
   housing?: boolean
   /** Hábito a reducir (ej. tabaco): objetivo ideal = 0 */
@@ -86,6 +86,8 @@ export interface Settings {
   theme: Theme
   name: string
   paymentMethods: string[]
+  /** Versión de datos por defecto ya añadidos (2 = hábitos y objetivos) */
+  dataVersion?: number
 }
 
 export interface Backup {
@@ -97,4 +99,81 @@ export interface Backup {
   transactions: Transaction[]
   recurrings: Recurring[]
   funds: Fund[]
+  habits?: Habit[]
+  habitLogs?: HabitLog[]
+  goals?: Goal[]
+  ideas?: Idea[]
+  reviews?: WeeklyReview[]
+}
+
+// ── Crecimiento personal ────────────────────────────────────────────────
+
+export type Area = 'Deporte' | 'Cultura' | 'Música' | 'Aprendizaje' | 'Salud' | 'Social' | 'Casa'
+export const AREAS: Area[] = ['Deporte', 'Salud', 'Cultura', 'Música', 'Aprendizaje', 'Social', 'Casa']
+
+export type HabitUnit = 'veces' | 'min' | 'km' | 'paginas' | 'si_no'
+
+export interface Habit {
+  id: ID
+  name: string
+  icon: string
+  color: string
+  area: Area
+  unit: HabitUnit
+  /** Objetivo semanal en la unidad (para si_no: días por semana) */
+  weeklyTarget: number
+  /** Para calcular el coste por uso (ej. gimnasio → Deporte) */
+  linkedCategoryId?: ID
+  active: boolean
+  order: number
+}
+
+export interface HabitLog {
+  id: ID
+  habitId: ID
+  date: DateStr
+  value: number
+  sample?: boolean
+}
+
+export type GoalStatus = 'activo' | 'hecho' | 'pausado'
+
+export interface Goal {
+  id: ID
+  title: string
+  icon: string
+  area: Area
+  /** Con objetivo numérico (ej. 12 libros) o hito sí/no */
+  target?: number
+  current?: number
+  unit?: string
+  deadline?: DateStr
+  status: GoalStatus
+  note?: string
+  linkedFundId?: ID
+  linkedHabitId?: ID
+  createdAt: number
+}
+
+export type IdeaTag = 'casa' | 'viaje' | 'proyecto' | 'compra' | 'aprendizaje' | 'otro'
+export type IdeaStatus = 'nueva' | 'evaluando' | 'convertida' | 'descartada'
+
+export interface Idea {
+  id: ID
+  text: string
+  tag: IdeaTag
+  status: IdeaStatus
+  cost?: number
+  createdAt: number
+}
+
+export interface WeeklyReview {
+  /** id = lunes de la semana (AAAA-MM-DD) */
+  id: ID
+  wins: string
+  improve: string
+  focus: string
+  mood: number // 1–5
+  score: number
+  createdAt: number
 }

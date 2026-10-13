@@ -43,7 +43,6 @@ export function Categorias({ data }: { data: AppData }) {
             <p className="truncate text-sm">{c.name}</p>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
               {c.monthlyBudget > 0 ? `${money0(c.monthlyBudget)}/mes` : 'Sin límite'}
-              {c.weeklyPool ? ' · semanal' : ''}
               {c.housing ? ' · vivienda' : ''}
               {c.reduce ? ' · a reducir' : ''}
             </p>

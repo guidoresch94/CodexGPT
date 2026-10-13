@@ -1,9 +1,9 @@
-import { Home, List, PiggyBank, Plus, Wallet } from 'lucide-react'
+import { Home, Plus, Repeat, Target, Wallet } from 'lucide-react'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useData } from '../db/hooks'
-import { seedIfEmpty } from '../db/seed'
+import { ensureV2, seedIfEmpty } from '../db/seed'
 import { connectCloud, pullFromCloud, startAutoSave } from '../db/cloud'
-import type { Transaction } from '../types'
+import type { Habit, Transaction } from '../types'
 import { ToastProvider } from '../components/Toast'
 import { cx, Sheet } from '../components/ui'
 import { Dashboard } from '../modules/dashboard/Dashboard'
@@ -12,7 +12,10 @@ import { Presupuesto } from '../modules/finanzas/Presupuesto'
 import { Categorias } from '../modules/finanzas/Categorias'
 import { Fijos } from '../modules/finanzas/Fijos'
 import { TxForm } from '../modules/finanzas/TxForm'
-import { Huchas } from '../modules/objetivos/Huchas'
+import { Metas } from '../modules/objetivos/Metas'
+import { Habitos } from '../modules/habitos/Habitos'
+import { HabitLogForm } from '../modules/habitos/HabitLogForm'
+import { Review } from '../modules/dashboard/Review'
 import { Ajustes } from '../modules/ajustes/Ajustes'
 import { ActionsCtx } from './actions'
 import { go, useRoute, type Route } from './router'
@@ -24,6 +27,7 @@ export function App() {
       // Como artefacto de Claude: la copia de tu cuenta manda; si está vacía, se sube la local
       const cloud = await connectCloud()
       if (!cloud || !(await pullFromCloud())) await seedIfEmpty()
+      else await ensureV2()
       setReady(true)
       if (cloud) startAutoSave()
     })()
@@ -53,8 +57,12 @@ function Shell() {
   const data = useData()
   const { route, param } = useRoute()
   const [tx, setTx] = useState<Partial<Transaction> | null>(null)
+  const [habitLog, setHabitLog] = useState<Habit | null>(null)
+  const [review, setReview] = useState(false)
   const openTx = useCallback((initial?: Partial<Transaction>) => setTx(initial ?? {}), [])
   const closeTx = useCallback(() => setTx(null), [])
+  const openHabitLog = useCallback((h: Habit) => setHabitLog(h), [])
+  const openReview = useCallback(() => setReview(true), [])
   useTheme(data?.settings.theme)
 
   if (!data) return <Splash />
@@ -63,18 +71,25 @@ function Shell() {
     inicio: <Dashboard data={data} />,
     movimientos: <Movimientos data={data} filter={param} />,
     presupuesto: <Presupuesto data={data} />,
-    huchas: <Huchas data={data} />,
+    habitos: <Habitos data={data} />,
+    metas: <Metas key={param} data={data} tab={param} />,
     ajustes: <Ajustes data={data} />,
     categorias: <Categorias data={data} />,
     fijos: <Fijos data={data} />,
   }
 
   return (
-    <ActionsCtx.Provider value={{ openTx }}>
+    <ActionsCtx.Provider value={{ openTx, openHabitLog, openReview }}>
       <main className="mx-auto min-h-dvh max-w-lg px-4 pb-32 pt-[max(env(safe-area-inset-top),12px)]">{pages[route]}</main>
       <BottomNav route={route} onAdd={() => openTx()} />
       <Sheet open={!!tx} onClose={closeTx} title={tx?.id ? 'Editar movimiento' : 'Nuevo movimiento'} full>
         {tx && <TxForm key={tx.id ?? 'new'} data={data} initial={tx} onClose={closeTx} />}
+      </Sheet>
+      <Sheet open={!!habitLog} onClose={() => setHabitLog(null)} title={habitLog ? `${habitLog.icon} ${habitLog.name}` : ''}>
+        {habitLog && <HabitLogForm habit={habitLog} onDone={() => setHabitLog(null)} />}
+      </Sheet>
+      <Sheet open={review} onClose={() => setReview(false)} title="🧭 Revisión semanal" full>
+        {review && <Review data={data} onDone={() => setReview(false)} />}
       </Sheet>
     </ActionsCtx.Provider>
   )
@@ -82,13 +97,16 @@ function Shell() {
 
 const NAV: { route: Route; label: string; icon: typeof Home }[] = [
   { route: 'inicio', label: 'Inicio', icon: Home },
-  { route: 'movimientos', label: 'Movimientos', icon: List },
-  { route: 'presupuesto', label: 'Presupuesto', icon: Wallet },
-  { route: 'huchas', label: 'Huchas', icon: PiggyBank },
+  { route: 'movimientos', label: 'Gastos', icon: Wallet },
+  { route: 'habitos', label: 'Hábitos', icon: Repeat },
+  { route: 'metas', label: 'Metas', icon: Target },
 ]
 
 function BottomNav({ route, onAdd }: { route: Route; onAdd: () => void }) {
-  const active = (r: Route) => route === r || (r === 'presupuesto' && route === 'categorias') || (r === 'inicio' && (route === 'ajustes' || route === 'fijos'))
+  const active = (r: Route) =>
+    route === r ||
+    (r === 'movimientos' && (route === 'presupuesto' || route === 'categorias' || route === 'fijos')) ||
+    (r === 'inicio' && route === 'ajustes')
   const item = (n: (typeof NAV)[number]) => (
     <button
       key={n.route}

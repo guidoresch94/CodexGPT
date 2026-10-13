@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { go } from '../../app/router'
 import type { AppData } from '../../db/hooks'
+import { GastosTabs } from './GastosTabs'
 import { level, monthSummary, monthTxs, savedByCategory, spentByCategory } from '../../lib/calc'
 import { fmtMonthShort, monthKey, shiftMonth, today } from '../../lib/dates'
 import { money, money0, pct } from '../../lib/format'
@@ -16,6 +17,7 @@ export function Presupuesto({ data }: { data: AppData }) {
   const [edit, setEdit] = useState<Category | null>(null)
 
   const m = useMemo(() => monthSummary(transactions, categories, recurrings, settings, month), [transactions, categories, recurrings, settings, month])
+  const prev = useMemo(() => monthSummary(transactions, categories, recurrings, settings, shiftMonth(month, -1)), [transactions, categories, recurrings, settings, month])
   const mtx = useMemo(() => monthTxs(transactions, month), [transactions, month])
   const byCat = useMemo(() => spentByCategory(mtx), [mtx])
   const saved = useMemo(() => savedByCategory(mtx), [mtx])
@@ -66,7 +68,7 @@ export function Presupuesto({ data }: { data: AppData }) {
               {c.monthlyBudget > 0 && (
                 <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
                   {spent <= c.monthlyBudget ? `Quedan ${money(c.monthlyBudget - spent)}` : `Te has pasado ${money(spent - c.monthlyBudget)}`}
-                  {c.weeklyPool && ' · tarjeta semanal'}
+                  <Diff now={spent} before={prev.byRoot.get(c.id) ?? 0} />
                 </p>
               )}
             </div>
@@ -94,13 +96,14 @@ export function Presupuesto({ data }: { data: AppData }) {
   return (
     <div>
       <PageHeader
-        title="Presupuesto"
+        title="Gastos"
         right={
           <button onClick={() => go('categorias')} className="flex items-center gap-1.5 rounded-full bg-slate-200 px-3 py-1.5 text-xs dark:bg-white/10">
             <SlidersHorizontal size={14} /> Categorías
           </button>
         }
       />
+      <GastosTabs value="presupuesto" />
       <MonthSwitcher value={month} onChange={setMonth} />
 
       <Card className="mt-3">
@@ -219,5 +222,16 @@ function PlanLine({ label, value, bold, tone }: { label: string; value: number; 
       <span className="text-slate-600 dark:text-slate-300">{label}</span>
       <span className={cx('tabular-nums', tone)}>{money(value)}</span>
     </div>
+  )
+}
+
+/** Diferencia frente al mes anterior completo */
+function Diff({ now, before }: { now: number; before: number }) {
+  const d = now - before
+  if (before === 0 || Math.abs(d) < 1) return null
+  return (
+    <span className={cx('ml-1', d > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400')}>
+      · {d > 0 ? '▲' : '▼'} {money0(Math.abs(d))} vs mes pasado
+    </span>
   )
 }

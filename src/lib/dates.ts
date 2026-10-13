@@ -59,3 +59,5 @@ export const dayInMonth = (key: string, day: number): DateStr => {
   const { days } = monthRange(key)
   return `${key}-${String(Math.min(day, days)).padStart(2, '0')}`
 }
+
+export const addDaysISO = (s: DateStr, n: number) => toISO(addDays(parseISO(s), n))

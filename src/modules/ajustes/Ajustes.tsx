@@ -92,14 +92,9 @@ export function Ajustes({ data }: { data: AppData }) {
         <Field label="Nombre">
           <Input defaultValue={settings.name} onBlur={(e) => set({ name: e.target.value.trim() || 'tú' })} />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Ingreso mensual neto (€)">
-            <Input inputMode="decimal" defaultValue={String(settings.monthlyIncome)} onBlur={(e) => set({ monthlyIncome: parseAmount(e.target.value) })} />
-          </Field>
-          <Field label="Tarjeta semanal (€)" hint="Súper, ocio, cafés, transporte">
-            <Input inputMode="decimal" defaultValue={String(settings.weeklyAllowance)} onBlur={(e) => set({ weeklyAllowance: parseAmount(e.target.value) })} />
-          </Field>
-        </div>
+        <Field label="Ingreso mensual neto (€)">
+          <Input inputMode="decimal" defaultValue={String(settings.monthlyIncome)} onBlur={(e) => set({ monthlyIncome: parseAmount(e.target.value) })} />
+        </Field>
         <Field label="Objetivo máx. de sueldo en vivienda (%)">
           <Input inputMode="numeric" defaultValue={String(settings.housingTarget)} onBlur={(e) => set({ housingTarget: parseAmount(e.target.value) || 52 })} />
         </Field>
@@ -122,7 +117,7 @@ export function Ajustes({ data }: { data: AppData }) {
       <Card className="divide-y divide-slate-100 p-0 dark:divide-white/5">
         <LinkRow label="Categorías y presupuestos" onClick={() => go('categorias')} />
         <LinkRow label="Fijos y recurrentes" onClick={() => go('fijos')} />
-        <LinkRow label="Huchas" onClick={() => go('huchas')} />
+        <LinkRow label="Huchas" onClick={() => go('metas', 'huchas')} />
       </Card>
 
       <SectionTitle>Métodos de pago</SectionTitle>

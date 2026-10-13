@@ -46,6 +46,28 @@ export function TxForm({ data, initial, onClose }: Props) {
 
   const funds = data.funds.filter((f) => !f.archived)
 
+  /** Últimos gastos distintos (nota + categoría) para repetirlos con un toque */
+  const recents = useMemo(() => {
+    const seen = new Set<string>()
+    const out: Transaction[] = []
+    for (const t of data.transactions) {
+      if (t.kind !== 'gasto' || t.recurringId || !t.note || !t.categoryId || t.fundId) continue
+      const k = `${t.categoryId}|${t.note.toLowerCase()}`
+      if (seen.has(k)) continue
+      seen.add(k)
+      out.push(t)
+      if (out.length >= 8) break
+    }
+    return out
+  }, [data.transactions])
+
+  const applyRecent = (t: Transaction) => {
+    setAmount(fmtInput(t.shared ? t.shared.myShare : t.amount))
+    setCategoryId(t.categoryId)
+    setNote(t.note ?? '')
+    setMethod(t.paymentMethod ?? '')
+  }
+
   const changeKind = (k: TxKind) => {
     setKind(k)
     setCategoryId(undefined)
@@ -108,6 +130,26 @@ export function TxForm({ data, initial, onClose }: Props) {
           <div className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">Mi parte: {money(parseAmount(myShare))}</div>
         )}
       </div>
+
+      {!editing && kind === 'gasto' && recents.length > 0 && (
+        <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1">
+          {recents.map((t) => {
+            const c = data.catMap.get(t.categoryId!)
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => applyRecent(t)}
+                className="flex shrink-0 items-center gap-1.5 rounded-full bg-slate-100 py-1.5 pl-2 pr-3 text-xs active:scale-95 dark:bg-white/5"
+              >
+                <span>{c?.icon}</span>
+                <span className="max-w-[7rem] truncate">{t.note}</span>
+                <span className="tabular-nums text-slate-500">{money(t.shared ? t.shared.myShare : t.amount)}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
         {kind === 'transferencia' ? (

@@ -1,5 +1,5 @@
 import type { Category, DateStr, Fund, ID, Recurring, Settings, Transaction } from '../types'
-import { dayInMonth, daysBetween, daysLeftInWeek, monthKey, monthRange, today, weekDays, weekRange } from './dates'
+import { dayInMonth, daysBetween, monthKey, monthRange, shiftMonth, today } from './dates'
 
 /** Lo que de verdad me cuesta un gasto (si es compartido, solo mi parte) */
 export const net = (t: Transaction) => (t.shared ? t.shared.myShare : t.amount)
@@ -62,34 +62,58 @@ export const level = (spent: number, budget: number): Level => {
   return r > 1 ? 'over' : r >= 0.8 ? 'warn' : 'ok'
 }
 
-export const isWeekly = (c: Category | undefined, cats: Map<ID, Category>) => {
-  if (!c) return false
-  if (c.weeklyPool) return true
-  const r = rootId(c.id, cats)
-  return r ? !!cats.get(r)?.weeklyPool : false
-}
+/**
+ * Ritmo del mes para lo variable (súper, ocio, cafés…): cuánto queda,
+ * cuánto puedes gastar al día y la curva acumulada frente al ritmo ideal.
+ */
+export function monthPace(txs: Transaction[], cats: Category[], key: string) {
+  const catMap = byId(cats)
+  const variableRoots = cats.filter((c) => !c.parentId && !c.archived && c.type === 'variable')
+  const isVariable = new Set(variableRoots.map((c) => c.id))
+  const budget = variableRoots.reduce((s, c) => s + c.monthlyBudget, 0)
+  const { start, end, days } = monthRange(key)
+  const prevKey = shiftMonth(key, -1)
+  const prev = monthRange(prevKey)
+  const now = today()
+  const isCurrent = now >= start && now <= end
+  const todayDay = isCurrent ? Number(now.slice(8, 10)) : now > end ? days : 0
 
-export function weekly(txs: Transaction[], cats: Map<ID, Category>, settings: Settings, ref = new Date()) {
-  const { start, end } = weekRange(ref)
-  const days = weekDays(ref)
-  const perDay = new Map(days.map((d) => [d, 0]))
-  let spent = 0
+  const perDay = new Array(days + 1).fill(0)
+  const prevPerDay = new Array(32).fill(0)
   for (const t of txs) {
-    if (!isBudgetExpense(t) || !inRange(t, start, end)) continue
-    if (!isWeekly(cats.get(t.categoryId ?? ''), cats)) continue
-    spent += net(t)
-    perDay.set(t.date, (perDay.get(t.date) ?? 0) + net(t))
+    if (!isBudgetExpense(t)) continue
+    const r = rootId(t.categoryId, catMap)
+    if (!r || !isVariable.has(r)) continue
+    if (inRange(t, start, end)) perDay[Number(t.date.slice(8, 10))] += net(t)
+    else if (inRange(t, prev.start, prev.end)) prevPerDay[Number(t.date.slice(8, 10))] += net(t)
   }
-  const remaining = settings.weeklyAllowance - spent
-  const daysLeft = daysLeftInWeek(ref)
+  let acc = 0
+  let prevAcc = 0
+  const series = []
+  for (let d = 1; d <= days; d++) {
+    acc += perDay[d]
+    prevAcc += d <= prev.days ? prevPerDay[d] : 0
+    series.push({ day: d, actual: d <= todayDay ? Math.round(acc * 100) / 100 : null, ideal: Math.round((budget * d) / days), prev: Math.round(prevAcc) })
+  }
+  const spent = perDay.reduce((s, v) => s + v, 0)
+  const daysLeft = isCurrent ? days - todayDay + 1 : 0
+  const remaining = budget - spent
+  const idealToday = (budget * todayDay) / days
+  // Días sin gasto variable (hasta ayer, si el mes está en curso)
+  const countedDays = isCurrent ? todayDay - 1 : todayDay
+  let noSpendDays = 0
+  for (let d = 1; d <= countedDays; d++) if (perDay[d] === 0) noSpendDays++
   return {
-    start,
-    end,
+    budget,
     spent,
     remaining,
     daysLeft,
-    perDayAllowed: Math.max(0, remaining) / daysLeft,
-    days: days.map((d) => ({ date: d, amount: perDay.get(d) ?? 0 })),
+    perDayAllowed: daysLeft > 0 ? Math.max(0, remaining) / daysLeft : 0,
+    /** Positivo = vas por debajo del ritmo ideal */
+    vsPace: idealToday - spent,
+    noSpendDays,
+    series,
+    isCurrent,
   }
 }
 
@@ -221,7 +245,6 @@ export function alerts(txs: Transaction[], cats: Category[], recs: Recurring[], 
   const key = monthKey(today())
   const s = monthSummary(txs, cats, recs, settings, key)
   const out: Alert[] = []
-  const catMap = byId(cats)
   for (const c of cats) {
     if (c.parentId || c.archived || (c.type !== 'variable' && c.type !== 'fijo')) continue
     const spent = s.byRoot.get(c.id) ?? 0
@@ -241,8 +264,6 @@ export function alerts(txs: Transaction[], cats: Category[], recs: Recurring[], 
     if (before > 0 && now < beforeSameDay - 10)
       out.push({ tone: 'good', text: `${c.icon} Vas ${Math.round(beforeSameDay - now)} € por debajo en ${c.name} que el mes pasado a estas alturas. ¡Sigue así!` })
   }
-  const w = weekly(txs, catMap, settings)
-  if (w.remaining < 0) out.push({ tone: 'over', text: `💳 Te has pasado ${Math.round(-w.remaining)} € de la tarjeta semanal. Se reinicia el lunes.` })
   if (s.housingPct > settings.housingTarget)
     out.push({ tone: 'warn', text: `🏠 Vivienda = ${Math.round(s.housingPct)} % del sueldo (objetivo ≤ ${settings.housingTarget} %).` })
   const overdue = recurringStatus(recs, txs, key).filter((r) => r.overdue && r.recurring.kind === 'gasto')

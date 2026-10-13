@@ -1,30 +1,43 @@
-import { db } from './schema'
+import { allTables, db } from './schema'
 import type { Backup, Category, Transaction } from '../types'
 import { net } from '../lib/calc'
 import { capability } from '../lib/platform'
 
 export async function exportBackup(): Promise<Backup> {
-  const [settings, categories, transactions, recurrings, funds] = await Promise.all([
-    db.settings.toArray(),
-    db.categories.toArray(),
-    db.transactions.toArray(),
-    db.recurrings.toArray(),
-    db.funds.toArray(),
-  ])
-  return { app: 'mi-vida', version: 1, exportedAt: new Date().toISOString(), settings, categories, transactions, recurrings, funds }
+  const [settings, categories, transactions, recurrings, funds, habits, habitLogs, goals, ideas, reviews] = await Promise.all(allTables().map((t) => t.toArray()))
+  return {
+    app: 'mi-vida',
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    settings,
+    categories,
+    transactions,
+    recurrings,
+    funds,
+    habits,
+    habitLogs,
+    goals,
+    ideas,
+    reviews,
+  } as Backup
 }
 
 export async function importBackup(data: Backup) {
   if (data?.app !== 'mi-vida' || !Array.isArray(data.categories) || !Array.isArray(data.transactions)) {
     throw new Error('El archivo no parece una copia de seguridad de Mi Vida.')
   }
-  await db.transaction('rw', [db.settings, db.categories, db.transactions, db.recurrings, db.funds], async () => {
-    await Promise.all([db.settings.clear(), db.categories.clear(), db.transactions.clear(), db.recurrings.clear(), db.funds.clear()])
+  await db.transaction('rw', allTables(), async () => {
+    await Promise.all(allTables().map((t) => t.clear()))
     await db.settings.bulkPut(data.settings ?? [])
     await db.categories.bulkPut(data.categories)
     await db.transactions.bulkPut(data.transactions)
     await db.recurrings.bulkPut(data.recurrings ?? [])
     await db.funds.bulkPut(data.funds ?? [])
+    await db.habits.bulkPut(data.habits ?? [])
+    await db.habitLogs.bulkPut(data.habitLogs ?? [])
+    await db.goals.bulkPut(data.goals ?? [])
+    await db.ideas.bulkPut(data.ideas ?? [])
+    await db.reviews.bulkPut(data.reviews ?? [])
   })
 }
 
