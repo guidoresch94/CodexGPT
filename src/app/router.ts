@@ -1,28 +1,28 @@
-import { useEffect, useState } from 'react'
+import { useSyncExternalStore } from 'react'
 
 export type Route = 'inicio' | 'movimientos' | 'presupuesto' | 'huchas' | 'ajustes' | 'categorias' | 'fijos'
 
-const ROUTES: Route[] = ['inicio', 'movimientos', 'presupuesto', 'huchas', 'ajustes', 'categorias', 'fijos']
-
-const parse = (): { route: Route; param?: string } => {
-  const [r, param] = window.location.hash.replace(/^#\/?/, '').split('/')
-  return { route: ROUTES.includes(r as Route) ? (r as Route) : 'inicio', param }
+interface State {
+  route: Route
+  param?: string
 }
 
-/** Router mínimo por hash (#/movimientos/super) — funciona offline y en cualquier subruta */
+/** Router mínimo en memoria (los artefactos de Claude no permiten rutas en el hash) */
+let state: State = { route: 'inicio' }
+const listeners = new Set<() => void>()
+
 export function useRoute() {
-  const [state, setState] = useState(parse)
-  useEffect(() => {
-    const on = () => {
-      setState(parse())
-      window.scrollTo(0, 0)
-    }
-    window.addEventListener('hashchange', on)
-    return () => window.removeEventListener('hashchange', on)
-  }, [])
-  return state
+  return useSyncExternalStore(
+    (l) => {
+      listeners.add(l)
+      return () => listeners.delete(l)
+    },
+    () => state,
+  )
 }
 
 export const go = (route: Route, param?: string) => {
-  window.location.hash = `/${route}${param ? `/${param}` : ''}`
+  state = { route, param }
+  listeners.forEach((l) => l())
+  window.scrollTo(0, 0)
 }

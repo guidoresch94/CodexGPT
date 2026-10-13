@@ -6,15 +6,24 @@ import { VitePWA } from 'vite-plugin-pwa'
 // BASE permite publicar en una subruta (p. ej. GitHub Pages: /CodexGPT/)
 const base = process.env.BASE ?? '/'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // mode "artifact": un solo JS sin PWA, para empaquetarlo en una página de artefacto de Claude
+  const artifact = mode === 'artifact'
+  return {
   base,
   build: {
+    outDir: artifact ? 'dist-artifact' : 'dist',
+    chunkSizeWarningLimit: artifact ? 2000 : 500,
     rollupOptions: {
       output: {
-        manualChunks: {
-          charts: ['recharts'],
-          vendor: ['react', 'react-dom', 'dexie', 'dexie-react-hooks', 'date-fns'],
-        },
+        ...(artifact
+          ? { inlineDynamicImports: true }
+          : {
+              manualChunks: {
+                charts: ['recharts'],
+                vendor: ['react', 'react-dom', 'dexie', 'dexie-react-hooks', 'date-fns'],
+              },
+            }),
       },
     },
   },
@@ -22,6 +31,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
+      disable: artifact,
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       manifest: {
@@ -43,4 +53,5 @@ export default defineConfig({
       },
     }),
   ],
+}
 })

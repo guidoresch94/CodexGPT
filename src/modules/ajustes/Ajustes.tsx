@@ -7,9 +7,10 @@ import { download, exportBackup, importBackup, transactionsCsv } from '../../db/
 import { clearSamples, seedAll } from '../../db/seed'
 import { today } from '../../lib/dates'
 import { parseAmount } from '../../lib/format'
-import type { Settings, Theme } from '../../types'
+import type { Backup, Settings, Theme } from '../../types'
+import { useSyncStatus } from '../../db/cloud'
 import { useToast } from '../../components/Toast'
-import { Button, Card, Field, Input, PageHeader, Segmented, SectionTitle } from '../../components/ui'
+import { Button, Card, Field, Input, PageHeader, Segmented, SectionTitle, Sheet } from '../../components/ui'
 
 export function Ajustes({ data }: { data: AppData }) {
   const toast = useToast()
@@ -17,6 +18,9 @@ export function Ajustes({ data }: { data: AppData }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [method, setMethod] = useState('')
   const samples = data.transactions.filter((t) => t.sample).length
+  const sync = useSyncStatus()
+  /** Confirmación dentro de la app (el visor de Claude no muestra confirm()) */
+  const [ask, setAsk] = useState<{ text: string; ok: string; run: () => Promise<void> } | null>(null)
 
   const set = (patch: Partial<Settings>) => db.settings.put({ ...settings, ...patch })
 
@@ -29,12 +33,18 @@ export function Ajustes({ data }: { data: AppData }) {
   const importJson = async (file?: File) => {
     if (!file) return
     try {
-      const parsed = JSON.parse(await file.text())
-      if (!confirm('Esto reemplaza TODOS los datos actuales por los de la copia. ¿Continuar?')) return
-      await importBackup(parsed)
-      toast({ text: 'Copia restaurada ✓' })
-    } catch (e) {
-      alert(e instanceof Error ? e.message : 'No se pudo leer el archivo.')
+      const parsed = JSON.parse(await file.text()) as Backup
+      if (parsed?.app !== 'mi-vida') throw new Error()
+      setAsk({
+        text: `Esto reemplaza TODOS tus datos actuales por los de la copia (${parsed.transactions?.length ?? 0} movimientos).`,
+        ok: 'Restaurar copia',
+        run: async () => {
+          await importBackup(parsed)
+          toast({ text: 'Copia restaurada ✓' })
+        },
+      })
+    } catch {
+      toast({ text: 'Ese archivo no es una copia de Mi Vida.' })
     } finally {
       if (fileRef.current) fileRef.current.value = ''
     }
@@ -43,17 +53,25 @@ export function Ajustes({ data }: { data: AppData }) {
   const exportCsv = () =>
     download(`movimientos-${today()}.csv`, transactionsCsv(data.transactions, data.catMap, (id) => data.fundMap.get(id ?? '')?.name ?? ''), 'text/csv;charset=utf-8')
 
-  const removeSamples = async () => {
-    if (!confirm(`Se borrarán ${samples} movimientos de ejemplo. Tus categorías, presupuestos, fijos y huchas se quedan. ¿Continuar?`)) return
-    const n = await clearSamples()
-    toast({ text: `${n} movimientos de ejemplo borrados` })
-  }
+  const removeSamples = () =>
+    setAsk({
+      text: `Se borrarán ${samples} movimientos de ejemplo. Tus categorías, presupuestos, fijos y huchas se quedan.`,
+      ok: 'Borrar ejemplos',
+      run: async () => {
+        const n = await clearSamples()
+        toast({ text: `${n} movimientos de ejemplo borrados` })
+      },
+    })
 
-  const reset = async () => {
-    if (!confirm('Se borra TODO (movimientos, cambios en categorías y huchas) y vuelve a la configuración inicial sin datos de ejemplo. ¿Seguro? Haz antes una copia.')) return
-    await seedAll(false)
-    toast({ text: 'App reiniciada' })
-  }
+  const reset = () =>
+    setAsk({
+      text: 'Se borra TODO (movimientos y cambios en categorías y huchas) y vuelve a la configuración inicial, sin datos de ejemplo.',
+      ok: 'Borrar todo',
+      run: async () => {
+        await seedAll(false)
+        toast({ text: 'App reiniciada' })
+      },
+    })
 
   const addMethod = () => {
     const m = method.trim()
@@ -127,7 +145,7 @@ export function Ajustes({ data }: { data: AppData }) {
 
       <SectionTitle>Copia de seguridad</SectionTitle>
       <Card className="space-y-2">
-        <p className="text-xs text-slate-500 dark:text-slate-400">Tus datos viven solo en este dispositivo. Descarga una copia de vez en cuando (por ejemplo, a Google Drive).</p>
+        <SyncLine status={sync} />
         <div className="grid grid-cols-2 gap-2">
           <Button variant="soft" className="flex items-center justify-center gap-2" onClick={exportJson}><Download size={16} /> Exportar</Button>
           <Button variant="soft" className="flex items-center justify-center gap-2" onClick={() => fileRef.current?.click()}><Upload size={16} /> Importar</Button>
@@ -146,7 +164,29 @@ export function Ajustes({ data }: { data: AppData }) {
         <Button variant="danger" className="w-full" onClick={reset}>Empezar de cero</Button>
       </Card>
 
-      <p className="mt-8 text-center text-[11px] text-slate-400">Mi Vida · v0.1 (fase 1) · datos guardados en el dispositivo</p>
+      <p className="mt-8 text-center text-[11px] text-slate-400">Mi Vida · v0.1 (fase 1)</p>
+
+      <Sheet open={!!ask} onClose={() => setAsk(null)} title="¿Seguro?">
+        {ask && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600 dark:text-slate-300">{ask.text}</p>
+            <div className="flex gap-2">
+              <Button variant="soft" className="flex-1" onClick={() => setAsk(null)}>Cancelar</Button>
+              <Button
+                variant="danger"
+                className="flex-1 font-semibold"
+                onClick={async () => {
+                  const a = ask
+                  setAsk(null)
+                  await a.run()
+                }}
+              >
+                {ask.ok}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Sheet>
     </div>
   )
 }
@@ -158,4 +198,16 @@ function LinkRow({ label, onClick }: { label: string; onClick: () => void }) {
       <ChevronRight size={16} className="text-slate-400" />
     </button>
   )
+}
+
+function SyncLine({ status }: { status: ReturnType<typeof useSyncStatus> }) {
+  const text: Record<typeof status, string> = {
+    local: 'Tus datos se guardan en este dispositivo. Descarga una copia de vez en cuando.',
+    conectando: 'Conectando con tu cuenta de Claude…',
+    guardando: 'Guardando en tu cuenta de Claude…',
+    guardado: '✓ Guardado en tu cuenta de Claude: lo verás igual en el móvil y en el ordenador.',
+    error: 'No se pudo guardar en tu cuenta ahora mismo. Tus datos siguen en este dispositivo; se reintentará con el próximo cambio.',
+  }
+  const tone = status === 'guardado' ? 'text-emerald-600 dark:text-emerald-400' : status === 'error' ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'
+  return <p className={`text-xs ${tone}`}>{text[status]}</p>
 }

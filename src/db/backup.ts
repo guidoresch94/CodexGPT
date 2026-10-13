@@ -1,6 +1,7 @@
 import { db } from './schema'
 import type { Backup, Category, Transaction } from '../types'
 import { net } from '../lib/calc'
+import { capability } from '../lib/platform'
 
 export async function exportBackup(): Promise<Backup> {
   const [settings, categories, transactions, recurrings, funds] = await Promise.all([
@@ -55,7 +56,21 @@ export function transactionsCsv(txs: Transaction[], cats: Map<string, Category>,
   return '﻿' + [header.join(';'), ...rows].join('\n')
 }
 
-export function download(filename: string, content: string, type: string) {
+interface Downloads {
+  save(r: { filename: string; data: string }): Promise<unknown>
+}
+
+/** Descarga un archivo (en el visor de Claude, a través de su diálogo de guardar) */
+export async function download(filename: string, content: string, type: string) {
+  const cap = await capability<Downloads>('downloads')
+  if (cap) {
+    try {
+      await cap.save({ filename, data: content })
+      return true
+    } catch {
+      return false
+    }
+  }
   const blob = new Blob([content], { type })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -63,4 +78,5 @@ export function download(filename: string, content: string, type: string) {
   a.download = filename
   a.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
+  return true
 }

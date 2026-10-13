@@ -2,6 +2,7 @@ import { Home, List, PiggyBank, Plus, Wallet } from 'lucide-react'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useData } from '../db/hooks'
 import { seedIfEmpty } from '../db/seed'
+import { connectCloud, pullFromCloud, startAutoSave } from '../db/cloud'
 import type { Transaction } from '../types'
 import { ToastProvider } from '../components/Toast'
 import { cx, Sheet } from '../components/ui'
@@ -19,7 +20,13 @@ import { go, useRoute, type Route } from './router'
 export function App() {
   const [ready, setReady] = useState(false)
   useEffect(() => {
-    seedIfEmpty().then(() => setReady(true))
+    ;(async () => {
+      // Como artefacto de Claude: la copia de tu cuenta manda; si está vacía, se sube la local
+      const cloud = await connectCloud()
+      if (!cloud || !(await pullFromCloud())) await seedIfEmpty()
+      setReady(true)
+      if (cloud) startAutoSave()
+    })()
   }, [])
   return <ToastProvider>{ready ? <Shell /> : <Splash />}</ToastProvider>
 }
