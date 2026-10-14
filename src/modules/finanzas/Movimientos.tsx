@@ -59,7 +59,7 @@ export function Movimientos({ data, filter }: { data: AppData; filter?: string }
       <GastosTabs value="movimientos" />
       <MonthSwitcher value={month} onChange={setMonth} />
 
-      <div className="mt-3 flex items-center gap-2 rounded-2xl bg-white px-3 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-white/5">
+      <div className="mt-3 flex items-center gap-2 rounded-2xl bg-white px-3">
         <Search size={16} className="text-slate-400" />
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar nota, categoría o importe" className="w-full bg-transparent py-2.5 text-sm outline-none" />
       </div>
@@ -69,9 +69,9 @@ export function Movimientos({ data, filter }: { data: AppData; filter?: string }
           <button
             key={k}
             onClick={() => setKind(k)}
-            className={cx('rounded-full px-3 py-1 text-xs capitalize', kind === k ? 'bg-emerald-500 text-slate-950' : 'bg-slate-200 text-slate-700 dark:bg-white/10 dark:text-slate-300')}
+            className={cx('rounded-full px-3 py-1 text-xs capitalize', kind === k ? 'bg-accent text-white' : 'bg-ios-fill text-slate-700 dark:text-slate-300')}
           >
-            {k === 'transferencia' ? 'Huchas' : k === 'todo' ? 'Todo' : k + 's'}
+            {k === 'transferencia' ? 'Ahorros' : k === 'todo' ? 'Todo' : k + 's'}
           </button>
         ))}
         {filterCat && (
@@ -103,7 +103,7 @@ export function Movimientos({ data, filter }: { data: AppData; filter?: string }
                 <span className="first-letter:uppercase">{fmtDayLong(date)}</span>
                 {dayOut > 0 && <span className="tabular-nums">−{money(dayOut)}</span>}
               </div>
-              <div className="divide-y divide-slate-100 overflow-hidden rounded-3xl bg-white ring-1 ring-slate-200 dark:divide-white/5 dark:bg-slate-900 dark:ring-white/5">
+              <div className="divide-y divide-slate-100 overflow-hidden rounded-[22px] bg-ios-card dark:divide-white/5">
                 {txs.map((t) => (
                   <TxRow key={t.id} t={t} data={data} onClick={() => openTx(t)} />
                 ))}
@@ -126,7 +126,7 @@ export function TxRow({ t, data, onClick }: { t: Transaction; data: AppData; onC
   const color = t.kind === 'transferencia' ? (f?.color ?? '#60a5fa') : (c?.color ?? '#94a3b8')
   const title = t.note || (t.kind === 'transferencia' ? f?.name : c?.name) || 'Sin categoría'
   const sub = [
-    t.kind === 'transferencia' ? `A ${f?.name ?? 'hucha'}` : parent ? `${parent.name} › ${c?.name}` : c?.name,
+    t.kind === 'transferencia' ? `A ${f?.name ?? 'ahorros'}` : parent ? `${parent.name} › ${c?.name}` : c?.name,
     t.kind === 'gasto' && f ? `desde ${f.name}` : undefined,
     t.paymentMethod,
   ]

@@ -11,10 +11,10 @@ export const DEFAULT_SETTINGS: Settings = {
   monthlyIncome: 2717,
   weeklyAllowance: 165,
   housingTarget: 52,
-  theme: 'oscuro',
+  theme: 'claro',
   name: 'Guido',
   paymentMethods: ['Tarjeta', 'Bizum', 'Efectivo', 'Domiciliación'],
-  dataVersion: 2,
+  dataVersion: 3,
 }
 
 type CatSeed = Omit<Category, 'archived' | 'order'>
@@ -53,7 +53,7 @@ const RECURRINGS: Recurring[] = [
   { id: 'r-nomina', name: 'Nómina', amount: 2717, kind: 'ingreso', categoryId: 'nomina', dayOfMonth: 1, active: true },
   { id: 'r-alquiler', name: 'Alquiler', amount: 1250, kind: 'gasto', categoryId: 'alquiler', dayOfMonth: 1, active: true },
   { id: 'r-ahorro', name: 'Págate primero: ahorro', amount: 300, kind: 'transferencia', categoryId: 'ahorro', fundId: 'f-emergencia', dayOfMonth: 1, active: true },
-  { id: 'r-viajes', name: 'Hucha viajes', amount: 100, kind: 'transferencia', categoryId: 'viajes', fundId: 'f-viajes', dayOfMonth: 1, active: true },
+  { id: 'r-viajes', name: 'Ahorro viajes', amount: 100, kind: 'transferencia', categoryId: 'viajes', fundId: 'f-viajes', dayOfMonth: 1, active: true },
   { id: 'r-gym', name: 'Gimnasio', amount: 40, kind: 'gasto', categoryId: 'deporte', dayOfMonth: 2, active: true },
   { id: 'r-movil', name: 'Móvil', amount: 15, kind: 'gasto', categoryId: 'salud', dayOfMonth: 3, active: true },
   { id: 'r-internet', name: 'Internet', amount: 35, kind: 'gasto', categoryId: 'internet', dayOfMonth: 5, active: true },
@@ -126,18 +126,21 @@ function sampleTransactions(): Transaction[] {
 // ── Hábitos, objetivos e ideas ──────────────────────────────────────────
 
 const HABITS: Habit[] = [
-  { id: 'h-gym', name: 'Gimnasio', icon: '🏋️', color: '#10b981', area: 'Deporte', unit: 'veces', weeklyTarget: 3, linkedCategoryId: 'deporte', active: true, order: 0 },
+  { id: 'h-gym', name: 'Gimnasio', icon: '🏋️', color: '#10b981', area: 'Deporte', unit: 'veces', weeklyTarget: 3, linkedCategoryId: 'deporte', linkMode: 'suma', active: true, order: 0 },
   { id: 'h-basket', name: 'Basket con amigos', icon: '🏀', color: '#f97316', area: 'Deporte', unit: 'veces', weeklyTarget: 1, active: true, order: 1 },
   { id: 'h-padel', name: 'Pádel', icon: '🎾', color: '#a3e635', area: 'Deporte', unit: 'veces', weeklyTarget: 1, active: true, order: 2 },
   { id: 'h-run', name: 'Running', icon: '🏃', color: '#38bdf8', area: 'Deporte', unit: 'km', weeklyTarget: 15, active: true, order: 3 },
   { id: 'h-guitar', name: 'Guitarra', icon: '🎸', color: '#a78bfa', area: 'Música', unit: 'min', weeklyTarget: 120, active: true, order: 4 },
   { id: 'h-read', name: 'Lectura', icon: '📚', color: '#f59e0b', area: 'Cultura', unit: 'paginas', weeklyTarget: 50, active: true, order: 5 },
-  { id: 'h-nosmoke', name: 'Día sin fumar', icon: '🚭', color: '#34d399', area: 'Salud', unit: 'si_no', weeklyTarget: 7, active: true, order: 6 },
+  { id: 'h-nosmoke', name: 'Sin tabaco', icon: '🚭', color: '#34c759', area: 'Salud', unit: 'si_no', weeklyTarget: 7, linkedCategoryId: 'tabaco', linkMode: 'rompe', auto: true, active: true, order: 6 },
 ]
+
+const MOTO_STEPS = () =>
+  ['Examen teórico', 'Clases de pista', 'Examen de pista', 'Clases de circulación', 'Examen de circulación'].map((text, i) => ({ id: `s${i}`, text, done: false }))
 
 const GOALS: Goal[] = [
   { id: 'g-tabaco', title: 'Dejar el tabaco', icon: '🚭', area: 'Salud', target: 30, current: 0, unit: 'días seguidos', status: 'activo', linkedHabitId: 'h-nosmoke', createdAt: 0 },
-  { id: 'g-moto', title: 'Carnet de moto A2', icon: '🏍️', area: 'Aprendizaje', deadline: '2027-06-30', status: 'activo', createdAt: 0 },
+  { id: 'g-moto', title: 'Carnet de moto A2', icon: '🏍️', area: 'Aprendizaje', deadline: '2027-06-30', status: 'activo', steps: MOTO_STEPS(), createdAt: 0 },
   { id: 'g-guitarra', title: 'Tocar 3 canciones con la guitarra', icon: '🎸', area: 'Música', target: 3, current: 0, unit: 'canciones', status: 'activo', linkedHabitId: 'h-guitar', createdAt: 0 },
   { id: 'g-libros', title: 'Leer 12 libros en 2027', icon: '📚', area: 'Cultura', target: 12, current: 0, unit: 'libros', deadline: '2027-12-31', status: 'activo', createdAt: 0 },
   { id: 'g-emergencia', title: 'Fondo de emergencia completo', icon: '🛟', area: 'Casa', status: 'activo', linkedFundId: 'f-emergencia', createdAt: 0 },
@@ -173,12 +176,17 @@ function sampleHabitLogs(): HabitLog[] {
 
 export async function seedIfEmpty() {
   const exists = await db.settings.get('main')
-  if (exists) return ensureV2()
+  if (exists) return ensureUpgrades()
   await seedAll(true)
 }
 
 /** Para quien ya usaba la app: añade hábitos, objetivos e ideas por defecto una sola vez */
-export async function ensureV2() {
+export async function ensureUpgrades() {
+  await ensureV2()
+  await ensureV3()
+}
+
+async function ensureV2() {
   const s = await db.settings.get('main')
   if (!s || (s.dataVersion ?? 1) >= 2) return
   await db.transaction('rw', [db.settings, db.habits, db.goals, db.ideas], async () => {
@@ -212,4 +220,34 @@ export async function clearSamples() {
   await db.transactions.bulkDelete(ids)
   await db.habitLogs.bulkDelete(logIds)
   return ids.length + logIds.length
+}
+
+/**
+ * v3: une gastos y hábitos. Limpia enlaces a categorías borradas, marca los
+ * hábitos "sin" (tabaco) como automáticos y añade pasos al carnet de moto.
+ */
+async function ensureV3() {
+  const s = await db.settings.get('main')
+  if (!s || (s.dataVersion ?? 1) >= 3) return
+  await db.transaction('rw', [db.settings, db.habits, db.habitLogs, db.goals, db.categories], async () => {
+    const cats = new Set((await db.categories.toArray()).map((c) => c.id))
+    const logs = await db.habitLogs.toArray()
+    for (const h of await db.habits.toArray()) {
+      const patch: Partial<Habit> = {}
+      if (h.linkedCategoryId && !cats.has(h.linkedCategoryId)) patch.linkedCategoryId = undefined
+      const linked = patch.linkedCategoryId === undefined && 'linkedCategoryId' in patch ? undefined : h.linkedCategoryId
+      if (linked && !h.linkMode) patch.linkMode = h.unit === 'si_no' ? 'rompe' : 'suma'
+      if (h.unit === 'si_no' && (patch.linkMode ?? h.linkMode) === 'rompe' && !h.auto) {
+        const dates = logs.filter((l) => l.habitId === h.id).map((l) => l.date).sort()
+        patch.auto = true
+        patch.since = dates[0] ?? today()
+      }
+      if (/crypto|cripto|invers|bolsa/i.test(h.name) && h.area === 'Deporte') patch.area = 'Finanzas'
+      if (Object.keys(patch).length) await db.habits.update(h.id, patch)
+    }
+    for (const g of await db.goals.toArray()) {
+      if (/moto/i.test(g.title) && !g.steps?.length && g.status === 'activo') await db.goals.update(g.id, { steps: MOTO_STEPS() })
+    }
+    await db.settings.update('main', { dataVersion: 3 })
+  })
 }

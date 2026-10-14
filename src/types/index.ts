@@ -108,8 +108,8 @@ export interface Backup {
 
 // ── Crecimiento personal ────────────────────────────────────────────────
 
-export type Area = 'Deporte' | 'Cultura' | 'Música' | 'Aprendizaje' | 'Salud' | 'Social' | 'Casa'
-export const AREAS: Area[] = ['Deporte', 'Salud', 'Cultura', 'Música', 'Aprendizaje', 'Social', 'Casa']
+export type Area = 'Deporte' | 'Cultura' | 'Música' | 'Aprendizaje' | 'Salud' | 'Social' | 'Casa' | 'Finanzas'
+export const AREAS: Area[] = ['Deporte', 'Salud', 'Cultura', 'Música', 'Aprendizaje', 'Finanzas', 'Social', 'Casa']
 
 export type HabitUnit = 'veces' | 'min' | 'km' | 'paginas' | 'si_no'
 
@@ -122,8 +122,20 @@ export interface Habit {
   unit: HabitUnit
   /** Objetivo semanal en la unidad (para si_no: días por semana) */
   weeklyTarget: number
-  /** Para calcular el coste por uso (ej. gimnasio → Deporte) */
+  /** Categoría de gasto enlazada (ej. pádel → Deporte, tabaco → Tabaco) */
   linkedCategoryId?: ID
+  /**
+   * Cómo se relaciona con los gastos de esa categoría:
+   * - 'suma': un gasto ahí cuenta como sesión del hábito (sin cargarlo dos veces)
+   * - 'rompe': un gasto ahí corta la racha (hábitos a dejar, ej. tabaco)
+   */
+  linkMode?: 'suma' | 'rompe'
+  /**
+   * Hábito "sin": cada día cuenta como cumplido automáticamente desde `since`,
+   * salvo que haya una recaída (registro con valor -1) o un gasto que lo rompa.
+   */
+  auto?: boolean
+  since?: DateStr
   active: boolean
   order: number
 }
@@ -132,7 +144,10 @@ export interface HabitLog {
   id: ID
   habitId: ID
   date: DateStr
+  /** Para auto: -1 = recaída */
   value: number
+  /** Gasto que originó o acompaña este registro (para no duplicar) */
+  txId?: ID
   sample?: boolean
 }
 
@@ -152,6 +167,8 @@ export interface Goal {
   note?: string
   linkedFundId?: ID
   linkedHabitId?: ID
+  /** Pasos (checklist); si hay, el progreso es pasos hechos / total */
+  steps?: { id: ID; text: string; done: boolean }[]
   createdAt: number
 }
 

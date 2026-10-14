@@ -15,10 +15,10 @@ export function EmojiPicker({ value, onChange }: { value: string; onChange: (v: 
         <input
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="h-11 w-14 rounded-xl bg-slate-100 text-center text-2xl outline-none dark:bg-white/5"
+          className="h-11 w-14 rounded-xl bg-ios-fill text-center text-2xl outline-none"
           aria-label="Emoji personalizado"
         />
-        <span className="text-xs text-slate-500 dark:text-slate-400">Elige uno o escribe cualquier emoji</span>
+        <span className="text-xs text-slate-500 dark:text-slate-400">Elegí uno o escribí cualquier emoji</span>
       </div>
       <div className="grid grid-cols-10 gap-1">
         {EMOJIS.map((e) => (

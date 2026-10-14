@@ -1,5 +1,6 @@
 import type { Category, DateStr, Fund, ID, Recurring, Settings, Transaction } from '../types'
 import { dayInMonth, daysBetween, monthKey, monthRange, shiftMonth, today } from './dates'
+import { money0 } from './format'
 
 /** Lo que de verdad me cuesta un gasto (si es compartido, solo mi parte) */
 export const net = (t: Transaction) => (t.shared ? t.shared.myShare : t.amount)
@@ -64,7 +65,7 @@ export const level = (spent: number, budget: number): Level => {
 
 /**
  * Ritmo del mes para lo variable (súper, ocio, cafés…): cuánto queda,
- * cuánto puedes gastar al día y la curva acumulada frente al ritmo ideal.
+ * cuánto podés gastar al día y la curva acumulada frente al ritmo ideal.
  */
 export function monthPace(txs: Transaction[], cats: Category[], key: string) {
   const catMap = byId(cats)
@@ -101,8 +102,11 @@ export function monthPace(txs: Transaction[], cats: Category[], key: string) {
   const idealToday = (budget * todayDay) / days
   // Días sin gasto variable (hasta ayer, si el mes está en curso)
   const countedDays = isCurrent ? todayDay - 1 : todayDay
+  // Solo cuentan los días desde que empezaste a registrar gastos
+  const first = txs.reduce((m, t) => (t.date < m ? t.date : m), '9999')
+  const firstDay = first < start ? 1 : first <= end ? Number(first.slice(8, 10)) : days + 1
   let noSpendDays = 0
-  for (let d = 1; d <= countedDays; d++) if (perDay[d] === 0) noSpendDays++
+  for (let d = firstDay; d <= countedDays; d++) if (perDay[d] === 0) noSpendDays++
   return {
     budget,
     spent,
@@ -250,9 +254,9 @@ export function alerts(txs: Transaction[], cats: Category[], recs: Recurring[], 
     const spent = s.byRoot.get(c.id) ?? 0
     if (c.monthlyBudget <= 0) continue
     const r = spent / c.monthlyBudget
-    if (r > 1) out.push({ tone: 'over', text: `${c.icon} ${c.name}: te has pasado ${Math.round(spent - c.monthlyBudget)} € del presupuesto.` })
+    if (r > 1) out.push({ tone: 'over', text: `${c.icon} ${c.name}: te pasaste ${money0(spent - c.monthlyBudget)} del presupuesto.` })
     else if (r >= 0.8 && c.type === 'variable')
-      out.push({ tone: 'warn', text: `${c.icon} Llevas el ${Math.round(r * 100)} % de ${c.name} y quedan ${s.remaining} días.` })
+      out.push({ tone: 'warn', text: `${c.icon} Llevás el ${Math.round(r * 100)} % de ${c.name} y quedan ${s.remaining} días.` })
   }
   const prev = monthSummary(txs, cats, recs, settings, monthKey(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)))
   for (const c of cats) {
@@ -262,11 +266,39 @@ export function alerts(txs: Transaction[], cats: Category[], recs: Recurring[], 
     // Comparamos al mismo día del mes anterior para ser justos
     const beforeSameDay = (before / prev.days) * s.elapsed
     if (before > 0 && now < beforeSameDay - 10)
-      out.push({ tone: 'good', text: `${c.icon} Vas ${Math.round(beforeSameDay - now)} € por debajo en ${c.name} que el mes pasado a estas alturas. ¡Sigue así!` })
+      out.push({ tone: 'good', text: `${c.icon} Vas ${money0(beforeSameDay - now)} por debajo del mes pasado en ${c.name}. ¡Seguí así!` })
   }
   if (s.housingPct > settings.housingTarget)
-    out.push({ tone: 'warn', text: `🏠 Vivienda = ${Math.round(s.housingPct)} % del sueldo (objetivo ≤ ${settings.housingTarget} %).` })
+    out.push({ tone: 'warn', text: `🏠 La vivienda se lleva el ${Math.round(s.housingPct)} % de tu sueldo (tu objetivo es ≤ ${settings.housingTarget} %).` })
   const overdue = recurringStatus(recs, txs, key).filter((r) => r.overdue && r.recurring.kind === 'gasto')
-  if (overdue.length) out.push({ tone: 'info', text: `📌 Tienes ${overdue.length} pago${overdue.length > 1 ? 's' : ''} fijo${overdue.length > 1 ? 's' : ''} sin marcar como pagado.` })
+  if (overdue.length) out.push({ tone: 'info', text: `📌 Tenés ${overdue.length} pago${overdue.length > 1 ? 's' : ''} fijo${overdue.length > 1 ? 's' : ''} sin marcar como pagado.` })
   return out
+}
+
+/**
+ * Plan de ahorro: lo que tu presupuesto deja libre cada mes frente a lo que
+ * necesitás aportar para llegar a tiempo a cada meta.
+ */
+export function savingsPlan(cats: Category[], funds: Fund[], txs: Transaction[], income: number) {
+  const roots = cats.filter((c) => !c.parentId && !c.archived)
+  const expenses = roots.filter((c) => c.type === 'fijo' || c.type === 'variable').reduce((s, c) => s + c.monthlyBudget, 0)
+  const free = income - expenses
+  const items = funds
+    .filter((f) => !f.archived)
+    .map((f) => {
+      const balance = fundBalance(f, txs)
+      return { fund: f, balance, needed: monthlyNeeded(f, balance) ?? 0, eta: fundEta(f, balance, txs) }
+    })
+  const needed = items.reduce((s, i) => s + i.needed, 0)
+  return { free, needed, items }
+}
+
+/** Ritmo real de aportes (media de los últimos 3 meses) y fecha estimada para llegar a la meta */
+export function fundEta(f: Fund, balance: number, txs: Transaction[]) {
+  if (!f.target || balance >= f.target) return undefined
+  const from = shiftMonth(monthKey(today()), -3) + '-01'
+  const contributed = txs.filter((t) => t.fundId === f.id && t.date >= from).reduce((s, t) => s + (t.kind === 'transferencia' ? t.amount : t.kind === 'gasto' ? -net(t) : 0), 0)
+  const perMonth = contributed / 3
+  if (perMonth <= 0) return { perMonth: 0, months: undefined }
+  return { perMonth, months: Math.ceil((f.target - balance) / perMonth) }
 }

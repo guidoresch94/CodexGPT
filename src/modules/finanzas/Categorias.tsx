@@ -69,14 +69,14 @@ export function Categorias({ data }: { data: AppData }) {
         <ArrowLeft size={16} /> Presupuesto
       </button>
       <PageHeader title="Categorías" right={<Button className="flex items-center gap-1 py-2" onClick={() => setEdit({})}><Plus size={16} /> Nueva</Button>} />
-      <p className="px-1 text-xs text-slate-500 dark:text-slate-400">Toca una categoría para cambiar nombre, icono, color, presupuesto o convertirla en subcategoría.</p>
+      <p className="px-1 text-xs text-slate-500 dark:text-slate-400">Tocá una categoría para cambiar nombre, icono, color, presupuesto o convertirla en subcategoría.</p>
 
       {GROUPS.map((g) => {
         const roots = active.filter((c) => c.type === g.type && !c.parentId)
         if (!roots.length) return null
         return (
           <div key={g.type}>
-            <SectionTitle action={<button className="text-xs text-emerald-600 dark:text-emerald-400" onClick={() => setEdit({ type: g.type })}>+ Añadir</button>}>
+            <SectionTitle action={<button className="text-[13px] text-accent" onClick={() => setEdit({ type: g.type })}>+ Añadir</button>}>
               {g.label}
             </SectionTitle>
             <Card className="py-1">{roots.map((c) => item(c))}</Card>

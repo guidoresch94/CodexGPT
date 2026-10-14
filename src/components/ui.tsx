@@ -10,8 +10,8 @@ export function Card({ children, className, onClick }: { children: ReactNode; cl
     <div
       onClick={onClick}
       className={cx(
-        'rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-white/5 dark:shadow-none',
-        onClick && 'cursor-pointer active:scale-[0.99] transition',
+        'rounded-[22px] bg-ios-card p-4',
+        onClick && 'cursor-pointer transition active:scale-[0.985] active:opacity-90',
         className,
       )}
     >
@@ -22,8 +22,8 @@ export function Card({ children, className, onClick }: { children: ReactNode; cl
 
 export function SectionTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
-    <div className="mb-2 mt-6 flex items-center justify-between px-1">
-      <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{children}</h2>
+    <div className="mb-1.5 mt-7 flex items-end justify-between px-4">
+      <h2 className="text-[13px] font-normal uppercase tracking-wide text-slate-500">{children}</h2>
       {action}
     </div>
   )
@@ -32,15 +32,15 @@ export function SectionTitle({ children, action }: { children: ReactNode; action
 type BtnVariant = 'primary' | 'ghost' | 'soft' | 'danger'
 export function Button({ variant = 'primary', className, ...p }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: BtnVariant }) {
   const styles: Record<BtnVariant, string> = {
-    primary: 'bg-emerald-500 text-slate-950 hover:bg-emerald-400 font-semibold',
-    soft: 'bg-slate-100 text-slate-800 hover:bg-slate-200 dark:bg-white/5 dark:text-slate-100 dark:hover:bg-white/10',
+    primary: 'bg-accent text-white font-semibold hover:brightness-110',
+    soft: 'bg-ios-fill text-accent font-medium',
     ghost: 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/5',
     danger: 'bg-red-500/10 text-red-600 hover:bg-red-500/20 dark:text-red-400',
   }
   return (
     <button
       {...p}
-      className={cx('rounded-2xl px-4 py-3 text-sm transition active:scale-[0.98] disabled:opacity-40', styles[variant], className)}
+      className={cx('rounded-[14px] px-4 py-3 text-[15px] transition active:opacity-70 disabled:opacity-40', styles[variant], className)}
     />
   )
 }
@@ -48,7 +48,7 @@ export function Button({ variant = 'primary', className, ...p }: ButtonHTMLAttri
 export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">{label}</span>
+      <span className="mb-1.5 block px-1 text-[13px] text-slate-500">{label}</span>
       {children}
       {hint && <span className="mt-1 block text-xs text-slate-400 dark:text-slate-500">{hint}</span>}
     </label>
@@ -60,7 +60,7 @@ export function Input({ className, ...p }: InputHTMLAttributes<HTMLInputElement>
     <input
       {...p}
       className={cx(
-        'w-full rounded-xl bg-slate-100 px-3 py-2.5 text-sm text-slate-900 outline-none ring-emerald-500 focus:ring-2 dark:bg-white/5 dark:text-slate-100',
+        'w-full rounded-[12px] bg-ios-fill px-3.5 py-3 text-[15px] text-slate-950 outline-none placeholder:text-slate-400 ring-accent focus:ring-2 dark:text-white',
         className,
       )}
     />
@@ -71,11 +71,11 @@ export function Toggle({ checked, onChange, label, hint }: { checked: boolean; o
   return (
     <button type="button" onClick={() => onChange(!checked)} className="flex w-full items-center justify-between gap-3 py-2 text-left">
       <span>
-        <span className="block text-sm text-slate-800 dark:text-slate-100">{label}</span>
+        <span className="block text-[15px]">{label}</span>
         {hint && <span className="block text-xs text-slate-500 dark:text-slate-400">{hint}</span>}
       </span>
-      <span className={cx('relative h-6 w-11 shrink-0 rounded-full transition', checked ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-white/15')}>
-        <span className={cx('absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition', checked ? 'left-5.5' : 'left-0.5')} />
+      <span className={cx('relative h-[31px] w-[51px] shrink-0 rounded-full transition-colors', checked ? 'bg-emerald-500' : 'bg-ios-fill')}>
+        <span className={cx('absolute top-[2px] h-[27px] w-[27px] rounded-full bg-white shadow-[0_3px_8px_rgba(0,0,0,0.15)] transition-all', checked ? 'left-[22px]' : 'left-[2px]')} />
       </span>
     </button>
   )
@@ -83,15 +83,15 @@ export function Toggle({ checked, onChange, label, hint }: { checked: boolean; o
 
 export function Segmented<T extends string>({ value, options, onChange }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
   return (
-    <div className="flex rounded-2xl bg-slate-100 p-1 dark:bg-white/5">
+    <div className="flex rounded-[10px] bg-ios-fill p-[2px]">
       {options.map((o) => (
         <button
           key={o.value}
           type="button"
           onClick={() => onChange(o.value)}
           className={cx(
-            'flex-1 rounded-xl px-3 py-2 text-sm transition',
-            value === o.value ? 'bg-white font-semibold text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-500 dark:text-slate-400',
+            'flex-1 rounded-[8px] px-2 py-1.5 text-[13px] font-medium transition',
+            value === o.value ? 'bg-white text-slate-950 shadow-[0_3px_8px_rgba(0,0,0,0.12),0_3px_1px_rgba(0,0,0,0.04)] dark:bg-slate-600 dark:text-white' : 'text-slate-950 dark:text-white',
           )}
         >
           {o.label}
@@ -113,7 +113,7 @@ export function ProgressBar({ value, max, color, thin, fixed }: { value: number;
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : value > 0 ? 100 : 0
   const lvl = fixed && value <= max ? 'ok' : level(value, max)
   return (
-    <div className={cx('w-full overflow-hidden rounded-full bg-slate-200 dark:bg-white/10', thin ? 'h-1.5' : 'h-2.5')}>
+    <div className={cx('w-full overflow-hidden rounded-full bg-ios-fill', thin ? 'h-1.5' : 'h-2.5')}>
       <div className={cx('h-full rounded-full transition-all', !color && barColor[lvl])} style={{ width: `${pct}%`, background: color }} />
     </div>
   )
@@ -134,17 +134,18 @@ export function Sheet({ open, onClose, title, children, full }: { open: boolean;
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] animate-fade" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/40 animate-fade" onClick={onClose} />
       <div
         className={cx(
-          'relative flex w-full max-w-lg flex-col rounded-t-3xl bg-white pb-[env(safe-area-inset-bottom)] shadow-2xl animate-up dark:bg-slate-900 sm:rounded-3xl',
+          'relative flex w-full max-w-lg flex-col rounded-t-[14px] bg-ios-bg pb-[env(safe-area-inset-bottom)] shadow-2xl animate-up sm:rounded-[14px]',
           full ? 'h-[94dvh]' : 'max-h-[94dvh]',
         )}
       >
-        <div className="flex items-center justify-between px-5 pb-2 pt-4">
-          <h3 className="text-base font-semibold text-slate-900 dark:text-white">{title}</h3>
-          <button onClick={onClose} className="rounded-full p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10" aria-label="Cerrar">
-            <X size={20} />
+        <div className="mx-auto mt-1.5 h-[5px] w-9 rounded-full bg-slate-300 dark:bg-slate-600" />
+        <div className="relative flex items-center justify-center px-14 pb-3 pt-2.5">
+          <h3 className="truncate text-[17px] font-semibold">{title}</h3>
+          <button onClick={onClose} className="absolute right-4 grid h-[30px] w-[30px] place-items-center rounded-full bg-ios-fill text-slate-500" aria-label="Cerrar">
+            <X size={16} strokeWidth={2.5} />
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">{children}</div>
@@ -160,13 +161,13 @@ export function MonthSwitcher({ value, onChange }: { value: string; onChange: (v
     onChange(`${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`)
   }
   return (
-    <div className="flex items-center justify-between rounded-2xl bg-white px-2 py-1.5 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-white/5">
-      <button onClick={() => shift(-1)} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5" aria-label="Mes anterior">
-        <ChevronLeft size={18} />
+    <div className="flex items-center justify-between px-1">
+      <button onClick={() => shift(-1)} className="grid h-9 w-9 place-items-center rounded-full text-accent active:bg-ios-fill" aria-label="Mes anterior">
+        <ChevronLeft size={22} />
       </button>
-      <span className="text-sm font-semibold capitalize text-slate-800 dark:text-slate-100">{fmtMonth(value)}</span>
-      <button onClick={() => shift(1)} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5" aria-label="Mes siguiente">
-        <ChevronRight size={18} />
+      <span className="text-[17px] font-semibold first-letter:uppercase">{fmtMonth(value)}</span>
+      <button onClick={() => shift(1)} className="grid h-9 w-9 place-items-center rounded-full text-accent active:bg-ios-fill" aria-label="Mes siguiente">
+        <ChevronRight size={22} />
       </button>
     </div>
   )
@@ -183,9 +184,9 @@ export function Empty({ icon, text, children }: { icon: string; text: string; ch
 }
 
 export function CatIcon({ icon, color, size = 'md' }: { icon: string; color: string; size?: 'sm' | 'md' | 'lg' }) {
-  const s = { sm: 'h-8 w-8 text-base', md: 'h-10 w-10 text-lg', lg: 'h-12 w-12 text-2xl' }[size]
+  const s = { sm: 'h-[30px] w-[30px] text-[15px] rounded-[8px]', md: 'h-9 w-9 text-lg rounded-[10px]', lg: 'h-12 w-12 text-2xl rounded-[13px]' }[size]
   return (
-    <span className={cx('grid shrink-0 place-items-center rounded-2xl', s)} style={{ background: `${color}26` }}>
+    <span className={cx('grid shrink-0 place-items-center', s)} style={{ background: `${color}2e` }}>
       {icon}
     </span>
   )
@@ -193,12 +194,17 @@ export function CatIcon({ icon, color, size = 'md' }: { icon: string; color: str
 
 export function PageHeader({ title, subtitle, right }: { title: string; subtitle?: string; right?: ReactNode }) {
   return (
-    <header className="flex items-end justify-between gap-3 pb-3 pt-2">
-      <div>
-        {subtitle && <p className="text-xs text-slate-500 first-letter:uppercase dark:text-slate-400">{subtitle}</p>}
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{title}</h1>
+    <header className="flex items-end justify-between gap-3 px-1 pb-3 pt-3">
+      <div className="min-w-0">
+        {subtitle && <p className="text-[13px] font-semibold uppercase tracking-wide text-slate-500 first-letter:uppercase">{subtitle}</p>}
+        <h1 className="text-[34px] font-bold leading-tight tracking-[-0.02em]">{title}</h1>
       </div>
       {right}
     </header>
   )
+}
+
+/** Lista agrupada estilo iOS: filas con separadores con sangría */
+export function List({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cx('overflow-hidden rounded-[22px] bg-ios-card [&>*+*]:border-t [&>*+*]:border-ios-sep', className)}>{children}</div>
 }

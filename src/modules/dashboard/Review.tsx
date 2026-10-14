@@ -4,7 +4,7 @@ import { db } from '../../db/schema'
 import { byId, isBudgetExpense, monthPace, net, rootId, inRange } from '../../lib/calc'
 import { fmtDate, monthKey, weekRange } from '../../lib/dates'
 import { money, money0 } from '../../lib/format'
-import { logsByHabit, moneyScore, UNIT_LABEL, weekProgress, weekScore } from '../../lib/habits'
+import { moneyScore, UNIT_LABEL, weekProgress, weekScore } from '../../lib/habits'
 import { useToast } from '../../components/Toast'
 import { Button, cx } from '../../components/ui'
 import { ScoreRing } from '../habitos/ScoreRing'
@@ -40,10 +40,10 @@ export function Review({ data, onDone }: { data: AppData; onDone: () => void }) 
     return { total, top: [...byRoot].sort((a, b) => b[1] - a[1]).slice(0, 4), count: txs.length }
   }, [data.transactions, week, catMap])
 
-  const byH = useMemo(() => logsByHabit(data.habitLogs), [data.habitLogs])
+  const byH = data.byHabit
   const habits = data.habits.filter((h) => h.active).map((h) => ({ h, p: weekProgress(h, byH.get(h.id) ?? [], week.ref) }))
   const pace = monthPace(data.transactions, data.categories, monthKey(week.ref))
-  const score = weekScore(data.habits, data.habitLogs, moneyScore(pace), week.ref)
+  const score = weekScore(data.habits, data.byHabit, moneyScore(pace), week.ref, false)
 
   const worst = habits.filter((x) => !x.p.met).sort((a, b) => a.p.pct - b.p.pct)[0]
   const topCat = money_.top[0] ? catMap.get(money_.top[0][0]) : undefined
@@ -70,7 +70,7 @@ export function Review({ data, onDone }: { data: AppData; onDone: () => void }) 
       <div className="mt-2 flex gap-1.5">
         {steps.map((s, i) => (
           <button key={s} onClick={() => setStep(i)} className="flex-1">
-            <span className={cx('block h-1.5 rounded-full', i <= step ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-white/10')} />
+            <span className={cx('block h-1.5 rounded-full', i <= step ? 'bg-emerald-500' : 'bg-ios-fill')} />
             <span className={cx('mt-1 block text-[10px]', i === step ? 'font-semibold' : 'text-slate-400')}>{s}</span>
           </button>
         ))}
@@ -80,9 +80,9 @@ export function Review({ data, onDone }: { data: AppData; onDone: () => void }) 
         {step === 0 && (
           <div className="space-y-4">
             <h4 className="text-lg font-semibold">💸 ¿Qué gastaste?</h4>
-            <div className="rounded-2xl bg-slate-100 p-4 dark:bg-white/5">
+            <div className="rounded-2xl bg-ios-fill p-4">
               <p className="text-3xl font-bold tabular-nums">{money(money_.total)}</p>
-              <p className="text-xs text-slate-500">en {money_.count} gastos esta semana (sin fijos pagados desde huchas)</p>
+              <p className="text-xs text-slate-500">en {money_.count} gastos esta semana (sin contar lo pagado desde tus ahorros)</p>
             </div>
             <div className="space-y-2">
               {money_.top.map(([id, v]) => {
@@ -120,7 +120,7 @@ export function Review({ data, onDone }: { data: AppData; onDone: () => void }) 
                 </span>
               </div>
             ))}
-            <div className="flex items-center gap-4 rounded-2xl bg-slate-100 p-3 dark:bg-white/5">
+            <div className="flex items-center gap-4 rounded-2xl bg-ios-fill p-3">
               <ScoreRing value={score.score} size={60} />
               <p className="text-xs text-slate-500">Tu puntuación de la semana: 70 % hábitos + 30 % dinero.</p>
             </div>
@@ -139,11 +139,11 @@ export function Review({ data, onDone }: { data: AppData; onDone: () => void }) 
             </div>
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-slate-500">✨ Qué salió bien</span>
-              <textarea value={wins} onChange={(e) => setWins(e.target.value)} rows={3} placeholder="Fui 3 veces al gym, cené en casa…" className="w-full rounded-xl bg-slate-100 p-3 text-sm outline-none ring-emerald-500 focus:ring-2 dark:bg-white/5" />
+              <textarea value={wins} onChange={(e) => setWins(e.target.value)} rows={3} placeholder="Fui 3 veces al gym, cené en casa…" className="w-full rounded-xl bg-ios-fill p-3 text-sm outline-none ring-accent focus:ring-2" />
             </label>
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-slate-500">🔧 Qué mejorar</span>
-              <textarea value={improve} onChange={(e) => setImprove(e.target.value)} rows={3} placeholder="Demasiado delivery, poca guitarra…" className="w-full rounded-xl bg-slate-100 p-3 text-sm outline-none ring-emerald-500 focus:ring-2 dark:bg-white/5" />
+              <textarea value={improve} onChange={(e) => setImprove(e.target.value)} rows={3} placeholder="Demasiado delivery, poca guitarra…" className="w-full rounded-xl bg-ios-fill p-3 text-sm outline-none ring-accent focus:ring-2" />
             </label>
           </div>
         )}
@@ -152,10 +152,10 @@ export function Review({ data, onDone }: { data: AppData; onDone: () => void }) 
           <div className="space-y-4">
             <h4 className="text-lg font-semibold">🎯 Tu foco para la próxima semana</h4>
             <p className="text-sm text-slate-500">Solo una cosa. La verás cada día en Inicio.</p>
-            <textarea value={focus} onChange={(e) => setFocus(e.target.value)} rows={2} placeholder="Ej. Ir 3 veces al gimnasio" className="w-full rounded-xl bg-slate-100 p-3 text-base outline-none ring-emerald-500 focus:ring-2 dark:bg-white/5" />
+            <textarea value={focus} onChange={(e) => setFocus(e.target.value)} rows={2} placeholder="Ej. Ir 3 veces al gimnasio" className="w-full rounded-xl bg-ios-fill p-3 text-base outline-none ring-accent focus:ring-2" />
             <div className="flex flex-wrap gap-2">
               {suggestions.map((s) => (
-                <button key={s} onClick={() => setFocus(s)} className="rounded-full bg-slate-100 px-3 py-1.5 text-xs dark:bg-white/10">
+                <button key={s} onClick={() => setFocus(s)} className="rounded-full bg-ios-fill px-3 py-1.5 text-xs">
                   {s}
                 </button>
               ))}

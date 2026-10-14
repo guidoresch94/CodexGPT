@@ -3,6 +3,8 @@ import { useMemo, useState } from 'react'
 import { db } from '../../db/schema'
 import type { AppData } from '../../db/hooks'
 import { usageRank } from '../../lib/calc'
+import { habitsForCategory, linkModeOf } from '../../lib/habits'
+import type { TxDraft } from '../../app/actions'
 import { toISO, today } from '../../lib/dates'
 import { money, parseAmount, round2, uid } from '../../lib/format'
 import type { Transaction, TxKind } from '../../types'
@@ -15,7 +17,7 @@ const fmtInput = (n?: number) => (n ? String(round2(n)).replace('.', ',') : '')
 
 interface Props {
   data: AppData
-  initial?: Partial<Transaction>
+  initial?: TxDraft
   onClose: () => void
 }
 
@@ -76,6 +78,41 @@ export function TxForm({ data, initial, onClose }: Props) {
 
   const canSave = value > 0 && (kind === 'transferencia' ? !!fundId : !!categoryId)
 
+  // ── Unión con hábitos: un gasto en una categoría enlazada cuenta (o rompe) el hábito ──
+  const linked = useMemo(
+    () => (kind === 'gasto' && !fundId ? habitsForCategory(categoryId, data.habits, data.catMap) : []),
+    [kind, fundId, categoryId, data.habits, data.catMap],
+  )
+  const countable = linked.filter((h) => linkModeOf(h) === 'suma' && !h.auto)
+  const breaking = linked.filter((h) => linkModeOf(h) === 'rompe')
+  const alreadyLinked = useMemo(
+    () => new Set(data.habitLogs.filter((l) => (initial?.id && l.txId === initial.id) || l.id === initial?.linkLogId).map((l) => l.habitId)),
+    [data.habitLogs, initial],
+  )
+  const [skipHabits, setSkipHabits] = useState<Set<string>>(new Set())
+  const toggleHabit = (id: string) =>
+    setSkipHabits((s) => {
+      const n = new Set(s)
+      if (n.has(id)) n.delete(id)
+      else n.add(id)
+      return n
+    })
+
+  /** Crea, mueve o borra los registros de hábito que acompañan a este gasto */
+  const syncHabitLogs = async (tx: Transaction) => {
+    if (initial?.linkLogId) await db.habitLogs.update(initial.linkLogId, { txId: tx.id })
+    const mine = data.habitLogs.filter((l) => l.txId === tx.id)
+    for (const l of mine) {
+      const still = countable.some((h) => h.id === l.habitId) && !skipHabits.has(l.habitId)
+      if (!still) await db.habitLogs.delete(l.id)
+      else if (l.date !== tx.date) await db.habitLogs.update(l.id, { date: tx.date })
+    }
+    for (const h of countable) {
+      if (skipHabits.has(h.id) || mine.some((l) => l.habitId === h.id) || alreadyLinked.has(h.id)) continue
+      await db.habitLogs.put({ id: uid(), habitId: h.id, date: tx.date, value: 1, txId: tx.id })
+    }
+  }
+
   const save = async () => {
     if (!canSave) return
     const share = parseAmount(myShare)
@@ -93,19 +130,33 @@ export function TxForm({ data, initial, onClose }: Props) {
       recurringId: initial?.recurringId,
     }
     await db.transactions.put(tx)
+    await syncHabitLogs(tx)
     onClose()
     if (!editing) {
-      const label = kind === 'gasto' ? 'Gasto' : kind === 'ingreso' ? 'Ingreso' : 'Aportación'
-      toast({ text: `${label} de ${money(tx.amount)} guardado`, action: { label: 'Deshacer', run: () => db.transactions.delete(tx.id) } })
+      const label = kind === 'gasto' ? 'Gasto' : kind === 'ingreso' ? 'Ingreso' : 'Ahorro'
+      const counted = countable.filter((h) => !skipHabits.has(h.id) && !alreadyLinked.has(h.id))
+      const extra = counted.length ? ` · ${counted.map((h) => h.icon).join(' ')} +1` : ''
+      toast({ text: `${label} de ${money(tx.amount)} guardado${extra}`, action: { label: 'Deshacer', run: () => deleteTx(tx.id) } })
     }
   }
 
   const remove = async () => {
     if (!initial?.id) return
     const old = await db.transactions.get(initial.id)
-    await db.transactions.delete(initial.id)
+    const oldLogs = data.habitLogs.filter((l) => l.txId === initial.id)
+    await deleteTx(initial.id)
     onClose()
-    if (old) toast({ text: 'Movimiento borrado', action: { label: 'Deshacer', run: () => db.transactions.put(old) } })
+    if (old)
+      toast({
+        text: 'Movimiento borrado',
+        action: {
+          label: 'Deshacer',
+          run: async () => {
+            await db.transactions.put(old)
+            await db.habitLogs.bulkPut(oldLogs)
+          },
+        },
+      })
   }
 
   const yesterday = toISO(new Date(Date.now() - 864e5))
@@ -118,13 +169,13 @@ export function TxForm({ data, initial, onClose }: Props) {
         options={[
           { value: 'gasto', label: 'Gasto' },
           { value: 'ingreso', label: 'Ingreso' },
-          { value: 'transferencia', label: 'A hucha' },
+          { value: 'transferencia', label: 'Ahorrar' },
         ]}
       />
 
       <div className="text-center">
         <div className={cx('text-5xl font-bold tabular-nums tracking-tight', value ? 'text-slate-900 dark:text-white' : 'text-slate-300 dark:text-slate-600')}>
-          {amount || '0'} €
+          € {amount || '0'}
         </div>
         {shared && kind === 'gasto' && value > 0 && (
           <div className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">Mi parte: {money(parseAmount(myShare))}</div>
@@ -140,7 +191,7 @@ export function TxForm({ data, initial, onClose }: Props) {
                 key={t.id}
                 type="button"
                 onClick={() => applyRecent(t)}
-                className="flex shrink-0 items-center gap-1.5 rounded-full bg-slate-100 py-1.5 pl-2 pr-3 text-xs active:scale-95 dark:bg-white/5"
+                className="flex shrink-0 items-center gap-1.5 rounded-full bg-ios-fill py-1.5 pl-2 pr-3 text-xs active:scale-95"
               >
                 <span>{c?.icon}</span>
                 <span className="max-w-[7rem] truncate">{t.note}</span>
@@ -159,7 +210,7 @@ export function TxForm({ data, initial, onClose }: Props) {
                 key={f.id}
                 type="button"
                 onClick={() => setFundId(f.id)}
-                className={cx('flex items-center gap-2 rounded-2xl p-2 text-left text-sm ring-2 transition', fundId === f.id ? 'ring-emerald-500 bg-emerald-500/10' : 'ring-transparent bg-slate-100 dark:bg-white/5')}
+                className={cx('flex items-center gap-2 rounded-2xl p-2 text-left text-sm ring-2 transition', fundId === f.id ? 'ring-accent bg-accent/10' : 'ring-transparent bg-ios-fill')}
               >
                 <CatIcon icon={f.icon} color={f.color} size="sm" />
                 <span className="line-clamp-2 text-slate-800 dark:text-slate-100">{f.name}</span>
@@ -175,7 +226,7 @@ export function TxForm({ data, initial, onClose }: Props) {
                 onClick={() => setCategoryId(c.id)}
                 className={cx(
                   'flex flex-col items-center gap-1 rounded-2xl px-1 py-2 ring-2 transition active:scale-95',
-                  categoryId === c.id ? 'ring-emerald-500 bg-emerald-500/10' : 'ring-transparent',
+                  categoryId === c.id ? 'ring-accent bg-accent/10' : 'ring-transparent',
                 )}
               >
                 <CatIcon icon={c.icon} color={c.color} />
@@ -202,36 +253,36 @@ export function TxForm({ data, initial, onClose }: Props) {
                 { d: today(), l: 'Hoy' },
                 { d: yesterday, l: 'Ayer' },
               ].map((o) => (
-                <button key={o.l} type="button" onClick={() => setDate(o.d)} className={cx('rounded-full px-3 py-1 text-xs', date === o.d ? 'bg-emerald-500 text-slate-950' : 'bg-slate-200 dark:bg-white/10')}>
+                <button key={o.l} type="button" onClick={() => setDate(o.d)} className={cx('rounded-full px-3 py-1 text-xs', date === o.d ? 'bg-accent text-white' : 'bg-ios-fill')}>
                   {o.l}
                 </button>
               ))}
-              <input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} className="rounded-lg bg-slate-200 px-2 py-1 text-xs dark:bg-white/10 dark:[color-scheme:dark]" />
+              <input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} className="rounded-lg bg-ios-fill px-2 py-1 text-xs dark:[color-scheme:dark]" />
             </div>
             <Input placeholder="Nota (opcional)" value={note} onChange={(e) => setNote(e.target.value)} />
             <div className="flex flex-wrap gap-2">
               {data.settings.paymentMethods.map((m) => (
-                <button key={m} type="button" onClick={() => setMethod(method === m ? '' : m)} className={cx('rounded-full px-3 py-1 text-xs', method === m ? 'bg-emerald-500 text-slate-950' : 'bg-slate-200 dark:bg-white/10')}>
+                <button key={m} type="button" onClick={() => setMethod(method === m ? '' : m)} className={cx('rounded-full px-3 py-1 text-xs', method === m ? 'bg-accent text-white' : 'bg-ios-fill')}>
                   {m}
                 </button>
               ))}
             </div>
             {kind === 'gasto' && (
               <>
-                <Toggle checked={shared} onChange={setShared} label="Gasto compartido" hint="Pagaste tú y te devuelven (Bizum). Solo cuenta tu parte." />
+                <Toggle checked={shared} onChange={setShared} label="Gasto compartido" hint="Pagaste vos y te devuelven (Bizum). Solo cuenta tu parte." />
                 {shared && (
                   <div className="flex items-center gap-2">
                     <Input inputMode="decimal" placeholder="Mi parte €" value={myShare} onChange={(e) => setMyShare(e.target.value)} />
                     {[2, 3, 4].map((n) => (
-                      <button key={n} type="button" onClick={() => setMyShare(fmtInput(value / n))} className="rounded-lg bg-slate-200 px-2.5 py-2 text-xs dark:bg-white/10">
+                      <button key={n} type="button" onClick={() => setMyShare(fmtInput(value / n))} className="rounded-lg bg-ios-fill px-2.5 py-2 text-xs">
                         ÷{n}
                       </button>
                     ))}
                   </div>
                 )}
                 <label className="block text-sm">
-                  <span className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Pagar desde una hucha (no cuenta en el presupuesto del mes)</span>
-                  <select value={fundId ?? ''} onChange={(e) => setFundId(e.target.value || undefined)} className="w-full rounded-xl bg-slate-200 px-3 py-2 text-sm dark:bg-white/10">
+                  <span className="mb-1 block text-xs text-slate-500 dark:text-slate-400">Pagar con tus ahorros (no cuenta en el presupuesto del mes)</span>
+                  <select value={fundId ?? ''} onChange={(e) => setFundId(e.target.value || undefined)} className="w-full rounded-xl bg-ios-fill px-3 py-2 text-sm">
                     <option value="">No, del presupuesto mensual</option>
                     {funds.map((f) => (
                       <option key={f.id} value={f.id}>
@@ -246,6 +297,29 @@ export function TxForm({ data, initial, onClose }: Props) {
         )}
       </div>
 
+      {(countable.length > 0 || breaking.length > 0) && (
+        <div className="flex flex-wrap items-center gap-2 text-[13px]">
+          {countable.map((h) => {
+            const on = !skipHabits.has(h.id)
+            return (
+              <button
+                key={h.id}
+                type="button"
+                onClick={() => toggleHabit(h.id)}
+                className={cx('flex items-center gap-1.5 rounded-full px-3 py-1.5 transition', on ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : 'bg-ios-fill text-slate-500 line-through')}
+              >
+                {h.icon} {alreadyLinked.has(h.id) ? `Ya cuenta para ${h.name}` : `Cuenta para ${h.name}`}
+              </button>
+            )
+          })}
+          {breaking.map((h) => (
+            <span key={h.id} className="rounded-full bg-amber-500/15 px-3 py-1.5 text-amber-700 dark:text-amber-300">
+              {h.icon} Corta tu racha de {h.name}
+            </span>
+          ))}
+        </div>
+      )}
+
       <NumPad onKey={(k) => setAmount((v) => applyKey(v, k))} />
       <div className="flex gap-2">
         {editing && (
@@ -254,7 +328,7 @@ export function TxForm({ data, initial, onClose }: Props) {
           </Button>
         )}
         <Button className="flex-1 py-3.5 text-base" disabled={!canSave} onClick={save}>
-          {!value ? 'Escribe el importe' : !canSave ? (kind === 'transferencia' ? 'Elige una hucha' : 'Elige una categoría') : editing ? 'Guardar cambios' : 'Guardar'}
+          {!value ? 'Escribí el importe' : !canSave ? (kind === 'transferencia' ? 'Elegí un ahorro' : 'Elegí una categoría') : editing ? 'Guardar cambios' : 'Guardar'}
         </Button>
       </div>
 
@@ -270,4 +344,11 @@ export function TxForm({ data, initial, onClose }: Props) {
       </Sheet>
     </div>
   )
+}
+
+/** Borra un gasto y los registros de hábito que generó */
+async function deleteTx(id: string) {
+  const logs = await db.habitLogs.filter((l) => l.txId === id).toArray()
+  await db.habitLogs.bulkDelete(logs.map((l) => l.id))
+  await db.transactions.delete(id)
 }

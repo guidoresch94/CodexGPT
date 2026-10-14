@@ -64,6 +64,9 @@ export function CategoryEditor({ data, initial, onSaved }: Props) {
   const remove = async () => {
     if (!initial?.id || used || hasChildren) return
     await db.categories.delete(initial.id)
+    // Los hábitos enlazados a esta categoría quedan sin enlace
+    for (const h of data.habits.filter((x) => x.linkedCategoryId === initial.id))
+      await db.habits.update(h.id, { linkedCategoryId: undefined, linkMode: undefined, auto: false })
     toast({ text: 'Categoría borrada' })
     onSaved(initial.id)
   }
@@ -92,14 +95,14 @@ export function CategoryEditor({ data, initial, onSaved }: Props) {
       />
 
       {type !== 'ingreso' && (
-        <Field label={type === 'ahorro' ? 'Aportación mensual prevista (€)' : 'Presupuesto mensual (€)'} hint="Déjalo en 0 si no quieres límite.">
+        <Field label={type === 'ahorro' ? 'Aportación mensual prevista (€)' : 'Presupuesto mensual (€)'} hint="Dejalo en 0 si no querés límite.">
           <Input inputMode="decimal" placeholder="0" value={budget} onChange={(e) => setBudget(e.target.value)} />
         </Field>
       )}
 
       {type === 'ahorro' && (
-        <Field label="Hucha asociada">
-          <select value={fundId} onChange={(e) => setFundId(e.target.value)} className="w-full rounded-xl bg-slate-100 px-3 py-2.5 text-sm dark:bg-white/5">
+        <Field label="Ahorro asociado">
+          <select value={fundId} onChange={(e) => setFundId(e.target.value)} className="w-full rounded-xl bg-ios-fill px-3 py-2.5 text-sm">
             <option value="">Ninguna</option>
             {data.funds.map((f) => (
               <option key={f.id} value={f.id}>
@@ -112,7 +115,7 @@ export function CategoryEditor({ data, initial, onSaved }: Props) {
 
       {!hasChildren && parents.length > 0 && (
         <Field label="Subcategoría de" hint="Las subcategorías suman en el presupuesto de su categoría padre.">
-          <select value={parentId} onChange={(e) => setParentId(e.target.value)} className="w-full rounded-xl bg-slate-100 px-3 py-2.5 text-sm dark:bg-white/5">
+          <select value={parentId} onChange={(e) => setParentId(e.target.value)} className="w-full rounded-xl bg-ios-fill px-3 py-2.5 text-sm">
             <option value="">— Es una categoría principal —</option>
             {parents.map((p) => (
               <option key={p.id} value={p.id}>
@@ -145,13 +148,13 @@ export function CategoryEditor({ data, initial, onSaved }: Props) {
           <Button variant="soft" className="flex-1" onClick={toggleArchive}>
             {data.catMap.get(initial!.id!)?.archived ? 'Recuperar' : 'Archivar'}
           </Button>
-          <Button variant="danger" className="flex-1" disabled={used || hasChildren} onClick={remove} title={used ? 'Tiene movimientos: mejor archívala' : undefined}>
+          <Button variant="danger" className="flex-1" disabled={used || hasChildren} onClick={remove} title={used ? 'Tiene movimientos: mejor archivala' : undefined}>
             Borrar
           </Button>
         </div>
       )}
       {editing && (used || hasChildren) && (
-        <p className="text-center text-xs text-slate-500">Tiene movimientos o subcategorías: archívala para ocultarla sin perder el histórico.</p>
+        <p className="text-center text-xs text-slate-500">Tiene movimientos o subcategorías: archivala para ocultarla sin perder el histórico.</p>
       )}
     </div>
   )

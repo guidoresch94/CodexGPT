@@ -21,7 +21,7 @@ export function NumPad({ onKey }: { onKey: (k: string) => void }) {
           key={k}
           type="button"
           onClick={() => onKey(k)}
-          className="grid h-12 place-items-center rounded-2xl bg-slate-100 text-xl font-medium text-slate-900 transition active:scale-95 active:bg-slate-200 dark:bg-white/5 dark:text-white dark:active:bg-white/15"
+          className="grid h-12 place-items-center rounded-[12px] bg-ios-card text-[22px] font-normal transition active:bg-slate-300 dark:active:bg-slate-700"
           aria-label={k === 'del' ? 'Borrar' : k}
         >
           {k === 'del' ? <Delete size={22} /> : k}

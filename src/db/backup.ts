@@ -49,7 +49,7 @@ const num = (n: number) => n.toFixed(2).replace('.', ',')
 
 /** CSV con ; y coma decimal (se abre bien en Excel en español) */
 export function transactionsCsv(txs: Transaction[], cats: Map<string, Category>, fundName: (id?: string) => string) {
-  const header = ['Fecha', 'Tipo', 'Categoría', 'Importe', 'Mi parte', 'Hucha', 'Nota', 'Método de pago']
+  const header = ['Fecha', 'Tipo', 'Categoría', 'Importe', 'Mi parte', 'Ahorro', 'Nota', 'Método de pago']
   const rows = [...txs]
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((t) =>

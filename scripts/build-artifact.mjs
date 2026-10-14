@@ -12,7 +12,7 @@ const js = files
   .replace(/<\/script/gi, '<\\/script')
 
 const html = `<title>Mi Vida</title>
-<meta name="theme-color" content="#0b0f17">
+<meta name="theme-color" content="#f2f2f7">
 <style>${css}</style>
 <div id="root"></div>
 <script type="module">${js}</script>

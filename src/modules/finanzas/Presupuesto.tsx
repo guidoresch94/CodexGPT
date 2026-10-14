@@ -67,7 +67,7 @@ export function Presupuesto({ data }: { data: AppData }) {
               </div>
               {c.monthlyBudget > 0 && (
                 <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                  {spent <= c.monthlyBudget ? `Quedan ${money(c.monthlyBudget - spent)}` : `Te has pasado ${money(spent - c.monthlyBudget)}`}
+                  {spent <= c.monthlyBudget ? `Quedan ${money(c.monthlyBudget - spent)}` : `Te pasaste ${money(spent - c.monthlyBudget)}`}
                   <Diff now={spent} before={prev.byRoot.get(c.id) ?? 0} />
                 </p>
               )}
@@ -98,7 +98,7 @@ export function Presupuesto({ data }: { data: AppData }) {
       <PageHeader
         title="Gastos"
         right={
-          <button onClick={() => go('categorias')} className="flex items-center gap-1.5 rounded-full bg-slate-200 px-3 py-1.5 text-xs dark:bg-white/10">
+          <button onClick={() => go('categorias')} className="flex items-center gap-1.5 rounded-full bg-ios-fill px-3 py-1.5 text-xs">
             <SlidersHorizontal size={14} /> Categorías
           </button>
         }
@@ -127,7 +127,7 @@ export function Presupuesto({ data }: { data: AppData }) {
             <div className="mt-2">
               <ProgressBar value={m.spent} max={m.budget} />
             </div>
-            {m.fromFunds > 0 && <p className="mt-2 text-[11px] text-slate-500">+ {money0(m.fromFunds)} pagados desde huchas</p>}
+            {m.fromFunds > 0 && <p className="mt-2 text-[11px] text-slate-500">+ {money0(m.fromFunds)} pagados desde tus ahorros</p>}
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1">
@@ -144,10 +144,10 @@ export function Presupuesto({ data }: { data: AppData }) {
         <p className="mb-2 text-xs font-semibold text-slate-500 dark:text-slate-400">Tu plan mensual</p>
         <PlanLine label="Ingreso" value={settings.monthlyIncome} />
         <PlanLine label="Gastos presupuestados" value={-m.budget} />
-        <PlanLine label="Ahorro y huchas" value={-m.savingsBudget} />
+        <PlanLine label="Ahorro previsto" value={-m.savingsBudget} />
         <div className="my-2 border-t border-slate-100 dark:border-white/5" />
         <PlanLine label={unassigned >= 0 ? 'Sin asignar' : 'Te falta para cuadrar'} value={unassigned} bold tone={unassigned >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'} />
-        {unassigned < 0 && <p className="mt-2 text-[11px] text-slate-500">Tu plan reparte más de lo que ingresas. Baja un presupuesto o la aportación a una hucha (toca ✏️).</p>}
+        {unassigned < 0 && <p className="mt-2 text-[11px] text-slate-500">Tu plan reparte más de lo que ingresás. Bajá algún presupuesto (tocá ✏️).</p>}
       </Card>
 
       <SectionTitle>Gastos</SectionTitle>
@@ -155,7 +155,7 @@ export function Presupuesto({ data }: { data: AppData }) {
 
       {reduceRoots.length > 0 && (
         <>
-          <SectionTitle>Hábitos a reducir · objetivo 0 €</SectionTitle>
+          <SectionTitle>Hábitos a reducir · objetivo € 0</SectionTitle>
           <Card className="divide-y divide-slate-100 py-1 dark:divide-white/5">{reduceRoots.map(row)}</Card>
         </>
       )}
@@ -196,7 +196,7 @@ export function Presupuesto({ data }: { data: AppData }) {
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={history} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
               <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={11} stroke="#94a3b8" />
-              <Tooltip formatter={(v, n) => [money0(Number(v)), n === 'gasto' ? 'Gasto' : 'A huchas']} cursor={{ fill: '#94a3b822' }} contentStyle={{ borderRadius: 12, fontSize: 12 }} />
+              <Tooltip formatter={(v, n) => [money0(Number(v)), n === 'gasto' ? 'Gasto' : 'Ahorrado']} cursor={{ fill: '#94a3b822' }} contentStyle={{ borderRadius: 12, fontSize: 12 }} />
               <Bar dataKey="gasto" radius={[6, 6, 0, 0]} fill="#f97316" />
               <Bar dataKey="ahorro" radius={[6, 6, 0, 0]} fill="#38bdf8" />
             </BarChart>
@@ -204,7 +204,7 @@ export function Presupuesto({ data }: { data: AppData }) {
         </div>
         <div className="mt-1 flex justify-center gap-4 text-[11px] text-slate-500">
           <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-orange-500" /> Gasto</span>
-          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-sky-400" /> A huchas</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-sky-400" /> Ahorrado</span>
           <span>Presupuesto: {money0(m.budget)}</span>
         </div>
       </Card>

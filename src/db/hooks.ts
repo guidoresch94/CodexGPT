@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import { db } from './schema'
 import { DEFAULT_SETTINGS } from './seed'
 import { byId } from '../lib/calc'
+import { habitLogsMap } from '../lib/habits'
 import type { Category, Fund, Goal, Habit, HabitLog, ID, Idea, Recurring, Settings, Transaction, WeeklyReview } from '../types'
 
 export interface AppData {
@@ -18,6 +19,8 @@ export interface AppData {
   goals: Goal[]
   ideas: Idea[]
   reviews: WeeklyReview[]
+  /** Registros efectivos por hábito (incluye días automáticos y gastos enlazados) */
+  byHabit: Map<ID, HabitLog[]>
 }
 
 /** Todos los datos en vivo (el volumen es pequeño: cabe en memoria sin problema) */
@@ -38,7 +41,11 @@ export function useData(): AppData | undefined {
     return { settings: { ...DEFAULT_SETTINGS, ...settings }, categories, transactions, recurrings, funds, habits, habitLogs, goals, ideas, reviews }
   })
   return useMemo(
-    () => (raw ? { ...raw, catMap: byId(raw.categories), fundMap: byId(raw.funds) } : undefined),
+    () => {
+      if (!raw) return undefined
+      const catMap = byId(raw.categories)
+      return { ...raw, catMap, fundMap: byId(raw.funds), byHabit: habitLogsMap({ ...raw, catMap }) }
+    },
     [raw],
   )
 }

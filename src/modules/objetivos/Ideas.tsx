@@ -46,14 +46,14 @@ export function Ideas({ data }: { data: AppData }) {
   const toFund = async (i: Idea) => {
     await db.funds.put({ id: uid(), name: i.text.slice(0, 40), icon: tagIcon(i.tag), color: '#a78bfa', target: i.cost, initialBalance: 0, archived: false, order: data.funds.length })
     await setStatus(i, 'convertida')
-    toast({ text: '🐷 Convertida en hucha (en la pestaña Huchas)' })
+    toast({ text: '🐷 Convertida en ahorro (en la pestaña Ahorros)' })
   }
 
   return (
     <div>
       <Card className="space-y-3">
         <Input
-          placeholder="Apunta una idea antes de que se escape…"
+          placeholder="Anotá una idea antes de que se te escape…"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && add()}
@@ -61,7 +61,7 @@ export function Ideas({ data }: { data: AppData }) {
         />
         <div className="flex flex-wrap gap-1.5">
           {TAGS.map((t) => (
-            <button key={t.value} onClick={() => setTag(t.value)} className={cx('rounded-full px-2.5 py-1 text-xs', tag === t.value ? 'bg-emerald-500 text-slate-950' : 'bg-slate-100 dark:bg-white/10')}>
+            <button key={t.value} onClick={() => setTag(t.value)} className={cx('rounded-full px-2.5 py-1 text-xs', tag === t.value ? 'bg-accent text-white' : 'bg-ios-fill')}>
               {t.label}
             </button>
           ))}
@@ -73,7 +73,7 @@ export function Ideas({ data }: { data: AppData }) {
       </Card>
 
       {open.length === 0 ? (
-        <Empty icon="💡" text="Sin ideas pendientes. Apunta aquí lo que se te ocurra y decide luego." />
+        <Empty icon="💡" text="Sin ideas pendientes. Anotá acá lo que se te ocurra y decidí después." />
       ) : (
         <div className="mt-4 space-y-2">
           {open.map((i) => (
@@ -93,13 +93,13 @@ export function Ideas({ data }: { data: AppData }) {
                 </div>
               </div>
               <div className="mt-3 flex gap-2">
-                <button onClick={() => toGoal(i)} className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-slate-100 py-2 text-xs dark:bg-white/5">
+                <button onClick={() => toGoal(i)} className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-ios-fill py-2 text-xs">
                   <Target size={13} /> Objetivo
                 </button>
-                <button onClick={() => toFund(i)} className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-slate-100 py-2 text-xs dark:bg-white/5">
-                  <PiggyBank size={13} /> Hucha
+                <button onClick={() => toFund(i)} className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-ios-fill py-2 text-xs">
+                  <PiggyBank size={13} /> Ahorro
                 </button>
-                <button onClick={() => setStatus(i, 'descartada')} className="flex items-center justify-center gap-1 rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-500 dark:bg-white/5" aria-label="Descartar">
+                <button onClick={() => setStatus(i, 'descartada')} className="flex items-center justify-center gap-1 rounded-xl bg-ios-fill px-3 py-2 text-xs text-slate-500" aria-label="Descartar">
                   <X size={13} /> Descartar
                 </button>
               </div>
@@ -110,7 +110,7 @@ export function Ideas({ data }: { data: AppData }) {
 
       {closed.length > 0 && (
         <>
-          <SectionTitle action={<button onClick={() => setShowOld(!showOld)} className="text-xs text-emerald-600 dark:text-emerald-400">{showOld ? 'Ocultar' : 'Ver'}</button>}>
+          <SectionTitle action={<button onClick={() => setShowOld(!showOld)} className="text-[13px] text-accent">{showOld ? 'Ocultar' : 'Ver'}</button>}>
             Archivadas ({closed.length})
           </SectionTitle>
           {showOld && (

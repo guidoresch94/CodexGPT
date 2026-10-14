@@ -5,7 +5,8 @@ import { parseAmount, uid } from '../../lib/format'
 import { AREAS, type Area, type Habit, type HabitUnit } from '../../types'
 import { ColorPicker, EmojiPicker } from '../../components/Pickers'
 import { useToast } from '../../components/Toast'
-import { Button, cx, Field, Input, Toggle } from '../../components/ui'
+import { Button, cx, Field, Input, Segmented, Toggle } from '../../components/ui'
+import { today } from '../../lib/dates'
 
 const UNITS: { value: HabitUnit; label: string; hint: string }[] = [
   { value: 'veces', label: 'Veces', hint: 'veces por semana' },
@@ -23,7 +24,8 @@ export function HabitEditor({ data, initial, onDone }: { data: AppData; initial:
   const [area, setArea] = useState<Area>(initial.area ?? 'Deporte')
   const [unit, setUnit] = useState<HabitUnit>(initial.unit ?? 'veces')
   const [target, setTarget] = useState(String(initial.weeklyTarget ?? 3))
-  const [linked, setLinked] = useState(initial.linkedCategoryId ?? '')
+  const [linked, setLinked] = useState(initial.linkedCategoryId && data.catMap.has(initial.linkedCategoryId) ? initial.linkedCategoryId : '')
+  const [mode, setMode] = useState<'suma' | 'rompe'>(initial.linkMode ?? (initial.unit === 'si_no' ? 'rompe' : 'suma'))
   const [active, setActive] = useState(initial.active ?? true)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const valid = name.trim() && parseAmount(target) > 0
@@ -39,6 +41,10 @@ export function HabitEditor({ data, initial, onDone }: { data: AppData; initial:
       unit,
       weeklyTarget: unit === 'si_no' ? Math.min(7, parseAmount(target)) : parseAmount(target),
       linkedCategoryId: linked || undefined,
+      linkMode: linked ? mode : undefined,
+      // "Sin X" con gasto que lo rompe: cada día cuenta solo, no hace falta marcarlo
+      auto: unit === 'si_no' && !!linked && mode === 'rompe',
+      since: unit === 'si_no' && !!linked && mode === 'rompe' ? (initial.since ?? today()) : initial.since,
       active,
       order: initial.order ?? data.habits.length,
     })
@@ -67,7 +73,7 @@ export function HabitEditor({ data, initial, onDone }: { data: AppData; initial:
       <Field label="Cómo lo mides">
         <div className="flex flex-wrap gap-2">
           {UNITS.map((u) => (
-            <button key={u.value} type="button" onClick={() => setUnit(u.value)} className={cx('rounded-full px-3 py-1.5 text-xs', unit === u.value ? 'bg-emerald-500 text-slate-950' : 'bg-slate-100 dark:bg-white/10')}>
+            <button key={u.value} type="button" onClick={() => setUnit(u.value)} className={cx('rounded-full px-3 py-1.5 text-xs', unit === u.value ? 'bg-accent text-white' : 'bg-ios-fill')}>
               {u.label}
             </button>
           ))}
@@ -80,15 +86,15 @@ export function HabitEditor({ data, initial, onDone }: { data: AppData; initial:
       <Field label="Área">
         <div className="flex flex-wrap gap-2">
           {AREAS.map((a) => (
-            <button key={a} type="button" onClick={() => setArea(a)} className={cx('rounded-full px-3 py-1.5 text-xs', area === a ? 'bg-emerald-500 text-slate-950' : 'bg-slate-100 dark:bg-white/10')}>
+            <button key={a} type="button" onClick={() => setArea(a)} className={cx('rounded-full px-3 py-1.5 text-xs', area === a ? 'bg-accent text-white' : 'bg-ios-fill')}>
               {a}
             </button>
           ))}
         </div>
       </Field>
 
-      <Field label="Coste por uso (opcional)" hint="Enlázalo a una categoría de gasto para ver cuánto te cuesta cada sesión.">
-        <select value={linked} onChange={(e) => setLinked(e.target.value)} className="w-full rounded-xl bg-slate-100 px-3 py-2.5 text-sm dark:bg-white/5">
+      <Field label="Enlazar con gastos (opcional)" hint="Así no cargás dos veces lo mismo.">
+        <select value={linked} onChange={(e) => setLinked(e.target.value)} className="w-full rounded-xl bg-ios-fill px-3 py-2.5 text-sm">
           <option value="">Sin enlazar</option>
           {data.categories
             .filter((c) => !c.archived && (c.type === 'fijo' || c.type === 'variable'))
@@ -99,6 +105,19 @@ export function HabitEditor({ data, initial, onDone }: { data: AppData; initial:
             ))}
         </select>
       </Field>
+      {linked && (
+        <Segmented
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: 'suma', label: 'Cada gasto suma 1' },
+            { value: 'rompe', label: 'Un gasto corta la racha' },
+          ]}
+        />
+      )}
+      {linked && mode === 'rompe' && unit === 'si_no' && (
+        <p className="px-1 text-[13px] text-slate-500">Cada día cuenta solo como cumplido. Si gastás en esa categoría o anotás una recaída, la racha vuelve a cero.</p>
+      )}
 
       <Field label="Icono">
         <EmojiPicker value={icon} onChange={setIcon} />
@@ -106,7 +125,7 @@ export function HabitEditor({ data, initial, onDone }: { data: AppData; initial:
       <Field label="Color">
         <ColorPicker value={color} onChange={setColor} />
       </Field>
-      <Toggle checked={active} onChange={setActive} label="Activo" hint="Ponlo en pausa sin perder el historial." />
+      <Toggle checked={active} onChange={setActive} label="Activo" hint="Pausalo sin perder el historial." />
 
       <Button className="w-full" disabled={!valid} onClick={save}>
         {initial.id ? 'Guardar' : 'Crear hábito'}

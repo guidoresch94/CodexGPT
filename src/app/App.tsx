@@ -1,9 +1,9 @@
 import { Home, Plus, Repeat, Target, Wallet } from 'lucide-react'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useData } from '../db/hooks'
-import { ensureV2, seedIfEmpty } from '../db/seed'
+import { ensureUpgrades, seedIfEmpty } from '../db/seed'
 import { connectCloud, pullFromCloud, startAutoSave } from '../db/cloud'
-import type { Habit, Transaction } from '../types'
+import type { Habit } from '../types'
 import { ToastProvider } from '../components/Toast'
 import { cx, Sheet } from '../components/ui'
 import { Dashboard } from '../modules/dashboard/Dashboard'
@@ -17,7 +17,7 @@ import { Habitos } from '../modules/habitos/Habitos'
 import { HabitLogForm } from '../modules/habitos/HabitLogForm'
 import { Review } from '../modules/dashboard/Review'
 import { Ajustes } from '../modules/ajustes/Ajustes'
-import { ActionsCtx } from './actions'
+import { ActionsCtx, type TxDraft } from './actions'
 import { go, useRoute, type Route } from './router'
 
 export function App() {
@@ -27,7 +27,7 @@ export function App() {
       // Como artefacto de Claude: la copia de tu cuenta manda; si está vacía, se sube la local
       const cloud = await connectCloud()
       if (!cloud || !(await pullFromCloud())) await seedIfEmpty()
-      else await ensureV2()
+      else await ensureUpgrades()
       setReady(true)
       if (cloud) startAutoSave()
     })()
@@ -43,9 +43,9 @@ function useTheme(theme: string | undefined) {
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
     const apply = () => {
-      const dark = theme === 'oscuro' || (theme === 'sistema' && mq.matches) || !theme
+      const dark = theme === 'oscuro' || (theme === 'sistema' && mq.matches)
       document.documentElement.classList.toggle('dark', dark)
-      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0b0f17' : '#f8fafc')
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#000000' : '#f2f2f7')
     }
     apply()
     mq.addEventListener('change', apply)
@@ -56,10 +56,10 @@ function useTheme(theme: string | undefined) {
 function Shell() {
   const data = useData()
   const { route, param } = useRoute()
-  const [tx, setTx] = useState<Partial<Transaction> | null>(null)
+  const [tx, setTx] = useState<TxDraft | null>(null)
   const [habitLog, setHabitLog] = useState<Habit | null>(null)
   const [review, setReview] = useState(false)
-  const openTx = useCallback((initial?: Partial<Transaction>) => setTx(initial ?? {}), [])
+  const openTx = useCallback((initial?: TxDraft) => setTx(initial ?? {}), [])
   const closeTx = useCallback(() => setTx(null), [])
   const openHabitLog = useCallback((h: Habit) => setHabitLog(h), [])
   const openReview = useCallback(() => setReview(true), [])
@@ -80,15 +80,15 @@ function Shell() {
 
   return (
     <ActionsCtx.Provider value={{ openTx, openHabitLog, openReview }}>
-      <main className="mx-auto min-h-dvh max-w-lg px-4 pb-32 pt-[max(env(safe-area-inset-top),12px)]">{pages[route]}</main>
+      <main className="mx-auto min-h-dvh max-w-lg px-4 pb-28 pt-[max(env(safe-area-inset-top),8px)]">{pages[route]}</main>
       <BottomNav route={route} onAdd={() => openTx()} />
       <Sheet open={!!tx} onClose={closeTx} title={tx?.id ? 'Editar movimiento' : 'Nuevo movimiento'} full>
         {tx && <TxForm key={tx.id ?? 'new'} data={data} initial={tx} onClose={closeTx} />}
       </Sheet>
       <Sheet open={!!habitLog} onClose={() => setHabitLog(null)} title={habitLog ? `${habitLog.icon} ${habitLog.name}` : ''}>
-        {habitLog && <HabitLogForm habit={habitLog} onDone={() => setHabitLog(null)} />}
+        {habitLog && <HabitLogForm habit={habitLog} data={data} onDone={() => setHabitLog(null)} />}
       </Sheet>
-      <Sheet open={review} onClose={() => setReview(false)} title="🧭 Revisión semanal" full>
+      <Sheet open={review} onClose={() => setReview(false)} title="Revisión semanal" full>
         {review && <Review data={data} onDone={() => setReview(false)} />}
       </Sheet>
     </ActionsCtx.Provider>
@@ -111,23 +111,23 @@ function BottomNav({ route, onAdd }: { route: Route; onAdd: () => void }) {
     <button
       key={n.route}
       onClick={() => go(n.route)}
-      className={cx('flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px]', active(n.route) ? 'text-emerald-500' : 'text-slate-500 dark:text-slate-400')}
+      className={cx('flex flex-1 flex-col items-center gap-[3px] pb-1 pt-2 text-[10px] font-medium', active(n.route) ? 'text-accent' : 'text-slate-500')}
     >
-      <n.icon size={22} strokeWidth={active(n.route) ? 2.4 : 1.8} />
+      <n.icon size={25} strokeWidth={active(n.route) ? 2.3 : 1.7} />
       {n.label}
     </button>
   )
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur dark:border-white/5 dark:bg-[#0b0f17]/90">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-ios-sep bg-ios-bg/80 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl backdrop-saturate-150">
       <div className="mx-auto flex max-w-lg items-center px-2">
         {NAV.slice(0, 2).map(item)}
         <div className="flex flex-1 justify-center">
           <button
             onClick={onAdd}
             aria-label="Añadir movimiento"
-            className="-mt-7 grid h-16 w-16 place-items-center rounded-full bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/30 transition active:scale-90"
+            className="grid h-[50px] w-[50px] place-items-center rounded-full bg-accent text-white shadow-[0_6px_16px_rgba(0,122,255,0.35)] transition active:scale-90"
           >
-            <Plus size={30} strokeWidth={2.6} />
+            <Plus size={28} strokeWidth={2.5} />
           </button>
         </div>
         {NAV.slice(2).map(item)}

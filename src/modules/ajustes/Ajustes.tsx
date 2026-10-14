@@ -55,7 +55,7 @@ export function Ajustes({ data }: { data: AppData }) {
 
   const removeSamples = () =>
     setAsk({
-      text: `Se borrarán ${samples} movimientos de ejemplo. Tus categorías, presupuestos, fijos y huchas se quedan.`,
+      text: `Se borrarán ${samples} movimientos de ejemplo. Tus categorías, presupuestos, fijos y ahorros se quedan.`,
       ok: 'Borrar ejemplos',
       run: async () => {
         const n = await clearSamples()
@@ -65,7 +65,7 @@ export function Ajustes({ data }: { data: AppData }) {
 
   const reset = () =>
     setAsk({
-      text: 'Se borra TODO (movimientos y cambios en categorías y huchas) y vuelve a la configuración inicial, sin datos de ejemplo.',
+      text: 'Se borra TODO (movimientos y cambios en categorías y ahorros) y vuelve a la configuración inicial, sin datos de ejemplo.',
       ok: 'Borrar todo',
       run: async () => {
         await seedAll(false)
@@ -117,14 +117,14 @@ export function Ajustes({ data }: { data: AppData }) {
       <Card className="divide-y divide-slate-100 p-0 dark:divide-white/5">
         <LinkRow label="Categorías y presupuestos" onClick={() => go('categorias')} />
         <LinkRow label="Fijos y recurrentes" onClick={() => go('fijos')} />
-        <LinkRow label="Huchas" onClick={() => go('metas', 'huchas')} />
+        <LinkRow label="Ahorros" onClick={() => go('metas', 'ahorros')} />
       </Card>
 
       <SectionTitle>Métodos de pago</SectionTitle>
       <Card>
         <div className="flex flex-wrap gap-2">
           {settings.paymentMethods.map((m) => (
-            <span key={m} className="flex items-center gap-1 rounded-full bg-slate-100 py-1 pl-3 pr-1.5 text-xs dark:bg-white/10">
+            <span key={m} className="flex items-center gap-1 rounded-full bg-ios-fill py-1 pl-3 pr-1.5 text-xs">
               {m}
               <button onClick={() => set({ paymentMethods: settings.paymentMethods.filter((x) => x !== m) })} aria-label={`Quitar ${m}`} className="rounded-full p-0.5 hover:bg-slate-200 dark:hover:bg-white/10">
                 <X size={12} />
@@ -197,7 +197,7 @@ function LinkRow({ label, onClick }: { label: string; onClick: () => void }) {
 
 function SyncLine({ status }: { status: ReturnType<typeof useSyncStatus> }) {
   const text: Record<typeof status, string> = {
-    local: 'Tus datos se guardan en este dispositivo. Descarga una copia de vez en cuando.',
+    local: 'Tus datos se guardan en este dispositivo. Descargá una copia de vez en cuando.',
     conectando: 'Conectando con tu cuenta de Claude…',
     guardando: 'Guardando en tu cuenta de Claude…',
     guardado: '✓ Guardado en tu cuenta de Claude: lo verás igual en el móvil y en el ordenador.',

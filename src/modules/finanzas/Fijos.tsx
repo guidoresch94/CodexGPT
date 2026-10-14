@@ -37,7 +37,7 @@ export function Fijos({ data }: { data: AppData }) {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm">{r.name}</p>
                 <p className="text-[11px] text-slate-500">
-                  Día {r.dayOfMonth} · {r.kind === 'ingreso' ? 'ingreso' : r.kind === 'transferencia' ? 'a hucha' : 'gasto'}
+                  Día {r.dayOfMonth} · {r.kind === 'ingreso' ? 'ingreso' : r.kind === 'transferencia' ? 'a ahorro' : 'gasto'}
                 </p>
               </div>
               <div className="text-right">
@@ -123,14 +123,14 @@ function RecurringEditor({ data, initial, onDone }: { data: AppData; initial: Pa
         options={[
           { value: 'gasto', label: 'Gasto' },
           { value: 'ingreso', label: 'Ingreso' },
-          { value: 'transferencia', label: 'A hucha' },
+          { value: 'transferencia', label: 'Ahorrar' },
         ]}
       />
       <Field label="Nombre">
         <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej. Netflix" />
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Importe (€)" hint="Si varía, pon el habitual">
+        <Field label="Importe (€)" hint="Si varía, poné el habitual">
           <Input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" />
         </Field>
         <Field label="Día del mes">
@@ -138,9 +138,9 @@ function RecurringEditor({ data, initial, onDone }: { data: AppData; initial: Pa
         </Field>
       </div>
       {kind === 'transferencia' ? (
-        <Field label="Hucha">
-          <select value={fundId} onChange={(e) => setFundId(e.target.value)} className="w-full rounded-xl bg-slate-100 px-3 py-2.5 text-sm dark:bg-white/5">
-            <option value="">Elige…</option>
+        <Field label="Ahorro">
+          <select value={fundId} onChange={(e) => setFundId(e.target.value)} className="w-full rounded-xl bg-ios-fill px-3 py-2.5 text-sm">
+            <option value="">Elegí…</option>
             {data.funds.filter((f) => !f.archived).map((f) => (
               <option key={f.id} value={f.id}>{f.icon} {f.name}</option>
             ))}
@@ -148,15 +148,15 @@ function RecurringEditor({ data, initial, onDone }: { data: AppData; initial: Pa
         </Field>
       ) : (
         <Field label="Categoría">
-          <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-full rounded-xl bg-slate-100 px-3 py-2.5 text-sm dark:bg-white/5">
-            <option value="">Elige…</option>
+          <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-full rounded-xl bg-ios-fill px-3 py-2.5 text-sm">
+            <option value="">Elegí…</option>
             {cats.map((c) => (
               <option key={c.id} value={c.id}>{c.parentId ? '   ' : ''}{c.icon} {c.name}</option>
             ))}
           </select>
         </Field>
       )}
-      <Toggle checked={active} onChange={setActive} label="Activo" hint="Desactívalo para pausarlo sin borrarlo." />
+      <Toggle checked={active} onChange={setActive} label="Activo" hint="Desactivalo para pausarlo sin borrarlo." />
       <Button className="w-full" disabled={!valid} onClick={save}>Guardar</Button>
       {initial.id && <Button variant="danger" className="w-full" onClick={remove}>Borrar</Button>}
     </div>

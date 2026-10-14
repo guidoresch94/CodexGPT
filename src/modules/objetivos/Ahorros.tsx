@@ -3,37 +3,59 @@ import { useMemo, useState } from 'react'
 import { useActions } from '../../app/actions'
 import { db } from '../../db/schema'
 import type { AppData } from '../../db/hooks'
-import { fundBalance, monthlyNeeded } from '../../lib/calc'
-import { daysBetween, fmtDate, today } from '../../lib/dates'
+import { fundBalance, fundEta, monthlyNeeded, savingsPlan } from '../../lib/calc'
+import { fmtDate } from '../../lib/dates'
 import { money, money0, parseAmount, pct, round2, uid } from '../../lib/format'
 import type { Fund } from '../../types'
 import { ColorPicker, EmojiPicker } from '../../components/Pickers'
 import { useToast } from '../../components/Toast'
-import { Button, Card, CatIcon, Empty, Field, Input, ProgressBar, SectionTitle, Sheet } from '../../components/ui'
+import { Button, Card, CatIcon, cx, Empty, Field, Input, List, ProgressBar, SectionTitle, Sheet } from '../../components/ui'
 import { TxRow } from '../finanzas/Movimientos'
 
-export function Huchas({ data }: { data: AppData }) {
+export function Ahorros({ data }: { data: AppData }) {
+  const { openTx } = useActions()
   const [detail, setDetail] = useState<string | null>(null)
   const [edit, setEdit] = useState<Partial<Fund> | null>(null)
   const active = data.funds.filter((f) => !f.archived)
   const archived = data.funds.filter((f) => f.archived)
   const total = active.reduce((s, f) => s + fundBalance(f, data.transactions), 0)
+  const plan = useMemo(() => savingsPlan(data.categories, data.funds, data.transactions, data.settings.monthlyIncome), [data])
   const fund = detail ? data.fundMap.get(detail) : undefined
+  const enough = plan.free >= plan.needed
 
   return (
     <div>
-      <Card className="flex items-center justify-between bg-gradient-to-br from-sky-500/15 via-white to-white dark:from-sky-500/20 dark:via-slate-900 dark:to-slate-900">
-        <div>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Total ahorrado</p>
-          <p className="text-3xl font-bold tabular-nums">{money(total)}</p>
+      <Card>
+        <p className="text-[13px] text-slate-500">Total ahorrado</p>
+        <p className="text-[34px] font-bold leading-tight tracking-tight tabular-nums">{money(total)}</p>
+        <div className="mt-3 flex gap-2">
+          <Button className="flex-1" onClick={() => openTx({ kind: 'transferencia' })}>
+            Ahorrar
+          </Button>
+          <Button variant="soft" className="flex items-center gap-1" onClick={() => setEdit({})}>
+            <Plus size={16} /> Nuevo
+          </Button>
         </div>
-        <Button className="flex items-center gap-1 py-2" onClick={() => setEdit({})}>
-          <Plus size={16} /> Hucha
-        </Button>
       </Card>
 
-      <div className="mt-4 space-y-3">
-        {active.length === 0 && <Empty icon="🐷" text="Crea tu primera hucha: viaje, colchón, moto…" />}
+      {plan.needed > 0 && (
+        <>
+          <SectionTitle>Plan del mes</SectionTitle>
+          <List>
+            <PlanRow label="Tu presupuesto te deja libre" value={money0(plan.free)} />
+            <PlanRow label="Para llegar a tiempo a tus metas" value={money0(plan.needed)} />
+            <div className={cx('px-4 py-3 text-[13px]', enough ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300')}>
+              {enough
+                ? `Te sobran ${money0(plan.free - plan.needed)} al mes. Llegás a todo si ahorrás lo que planeaste.`
+                : `Te faltan ${money0(plan.needed - plan.free)} al mes: bajá algún presupuesto o mové la fecha de alguna meta.`}
+            </div>
+          </List>
+        </>
+      )}
+
+      <SectionTitle>Tus ahorros</SectionTitle>
+      <div className="space-y-2.5">
+        {active.length === 0 && <Empty icon="🐷" text="Creá tu primer ahorro: viaje, colchón, moto…" />}
         {active.map((f) => (
           <FundCard key={f.id} fund={f} data={data} onClick={() => setDetail(f.id)} />
         ))}
@@ -41,8 +63,8 @@ export function Huchas({ data }: { data: AppData }) {
 
       {archived.length > 0 && (
         <>
-          <SectionTitle>Archivadas</SectionTitle>
-          <div className="space-y-3 opacity-70">
+          <SectionTitle>Archivados</SectionTitle>
+          <div className="space-y-2.5 opacity-70">
             {archived.map((f) => (
               <FundCard key={f.id} fund={f} data={data} onClick={() => setDetail(f.id)} />
             ))}
@@ -53,7 +75,7 @@ export function Huchas({ data }: { data: AppData }) {
       <Sheet open={!!fund} onClose={() => setDetail(null)} title={fund ? `${fund.icon} ${fund.name}` : ''}>
         {fund && <FundDetail fund={fund} data={data} onEdit={() => setEdit(fund)} />}
       </Sheet>
-      <Sheet open={!!edit} onClose={() => setEdit(null)} title={edit?.id ? 'Editar hucha' : 'Nueva hucha'}>
+      <Sheet open={!!edit} onClose={() => setEdit(null)} title={edit?.id ? 'Editar ahorro' : 'Nuevo ahorro'}>
         {edit && (
           <FundEditor
             key={edit.id ?? 'new'}
@@ -70,29 +92,50 @@ export function Huchas({ data }: { data: AppData }) {
   )
 }
 
+function PlanRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between px-4 py-3 text-[15px]">
+      <span>{label}</span>
+      <span className="font-semibold tabular-nums">{value}</span>
+    </div>
+  )
+}
+
+/** "en 14 meses (dic 2027)" */
+function etaText(months: number) {
+  const d = new Date()
+  d.setMonth(d.getMonth() + months)
+  const label = d.toLocaleDateString('es-AR', { month: 'short', year: 'numeric' })
+  return `${months} ${months === 1 ? 'mes' : 'meses'} (${label})`
+}
+
 function FundCard({ fund: f, data, onClick }: { fund: Fund; data: AppData; onClick: () => void }) {
   const b = fundBalance(f, data.transactions)
   const need = monthlyNeeded(f, b)
-  const daysLeft = f.deadline ? daysBetween(today(), f.deadline) : undefined
+  const eta = fundEta(f, b, data.transactions)
   return (
     <Card onClick={onClick}>
       <div className="flex items-center gap-3">
         <CatIcon icon={f.icon} color={f.color} size="lg" />
         <div className="min-w-0 flex-1">
-          <p className="truncate font-medium">{f.name}</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            {f.target ? `${pct((b / f.target) * 100)} de ${money0(f.target)}` : 'Sin meta'}
-            {f.deadline && ` · ${daysLeft! >= 0 ? `${daysLeft} días` : 'fecha pasada'}`}
-          </p>
+          <p className="truncate text-[17px] font-semibold">{f.name}</p>
+          <p className="text-[13px] text-slate-500">{f.target ? `${pct((b / f.target) * 100)} de ${money0(f.target)}` : 'Sin meta'}</p>
         </div>
-        <p className="text-lg font-bold tabular-nums">{money0(b)}</p>
+        <p className="text-[20px] font-semibold tabular-nums">{money0(b)}</p>
       </div>
       {f.target ? (
         <div className="mt-3">
           <ProgressBar value={b} max={f.target} color={f.color} />
-          {need !== undefined && (
-            <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-              {need === 0 ? '🎉 ¡Meta conseguida!' : `Necesitas ~${money0(need)}/mes para llegar el ${fmtDate(f.deadline!)}`}
+          <p className="mt-1.5 text-[13px] text-slate-500">
+            {need === 0
+              ? '🎉 ¡Meta lograda!'
+              : need !== undefined
+                ? `Necesitás ${money0(need)}/mes para llegar el ${fmtDate(f.deadline!)}`
+                : 'Poné una fecha para saber cuánto aportar por mes'}
+          </p>
+          {eta && (
+            <p className="text-[13px] text-slate-500">
+              {eta.months ? `Al ritmo de tus aportes (${money0(eta.perMonth)}/mes) llegás en ${etaText(eta.months)}` : 'Sin aportes en los últimos 3 meses'}
             </p>
           )}
         </div>
@@ -117,8 +160,8 @@ function FundDetail({ fund, data, onEdit }: { fund: Fund; data: AppData; onEdit:
             <ProgressBar value={b} max={fund.target} color={fund.color} />
           </div>
         ) : null}
-        {need ? <p className="mt-2 text-xs text-slate-500">Aporta ~{money0(need)}/mes para llegar a tiempo ({fmtDate(fund.deadline!)})</p> : null}
-        {fund.note && <p className="mt-2 rounded-xl bg-slate-100 p-2 text-xs text-slate-600 dark:bg-white/5 dark:text-slate-300">{fund.note}</p>}
+        {need ? <p className="mt-2 text-xs text-slate-500">Aportá ~{money0(need)}/mes para llegar a tiempo ({fmtDate(fund.deadline!)})</p> : null}
+        {fund.note && <p className="mt-2 rounded-xl bg-ios-fill p-2 text-xs text-slate-600 dark:text-slate-300">{fund.note}</p>}
       </div>
       <div className="grid grid-cols-3 gap-2">
         <Button onClick={() => openTx({ kind: 'transferencia', fundId: fund.id })}>Aportar</Button>
@@ -130,7 +173,7 @@ function FundDetail({ fund, data, onEdit }: { fund: Fund; data: AppData; onEdit:
         {history.length === 0 ? (
           <p className="py-4 text-center text-sm text-slate-500">Aún no hay movimientos. Saldo inicial: {money(fund.initialBalance)}</p>
         ) : (
-          <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl ring-1 ring-slate-200 dark:divide-white/5 dark:ring-white/5">
+          <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl dark:divide-white/5">
             {history.map((t) => (
               <TxRow key={t.id} t={t} data={data} onClick={() => openTx(t)} />
             ))}
@@ -170,7 +213,7 @@ function FundEditor({ data, initial, onDone }: { data: AppData; initial: Partial
       archived: initial.archived ?? false,
       order: initial.order ?? data.funds.length,
     })
-    toast({ text: 'Hucha guardada' })
+    toast({ text: 'Ahorro guardado' })
     onDone()
   }
 
@@ -183,7 +226,7 @@ function FundEditor({ data, initial, onDone }: { data: AppData; initial: Partial
   const remove = async () => {
     if (!initial.id || used) return
     await db.funds.delete(initial.id)
-    toast({ text: 'Hucha borrada' })
+    toast({ text: 'Ahorro borrado' })
     onDone(true)
   }
 
@@ -200,7 +243,7 @@ function FundEditor({ data, initial, onDone }: { data: AppData; initial: Partial
           <Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="dark:[color-scheme:dark]" />
         </Field>
       </div>
-      <Field label="Saldo inicial (€)" hint="Lo que ya tenías ahorrado aquí antes de usar la app">
+      <Field label="Saldo inicial (€)" hint="Lo que ya tenías ahorrado acá antes de usar la app">
         <Input inputMode="decimal" value={initialBalance} onChange={(e) => setInitialBalance(e.target.value)} placeholder="0" />
       </Field>
       <Field label="Nota">

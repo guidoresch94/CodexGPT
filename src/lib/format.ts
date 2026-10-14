@@ -1,10 +1,15 @@
-const eur = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' })
-const eur0 = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
+/** Número al estilo argentino: 1.234,56 (punto de miles, coma decimal) */
+export function num(n: number, decimals = 0) {
+  const fixed = Math.abs(n).toFixed(decimals)
+  const [int, dec] = fixed.split('.')
+  const withDots = int.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  return `${n < 0 ? '−' : ''}${withDots}${dec ? `,${dec}` : ''}`
+}
 
-/** 1.234,56 € */
-export const money = (n: number) => eur.format(n)
-/** 1.235 € (sin decimales, para resúmenes) */
-export const money0 = (n: number) => eur0.format(Math.round(n))
+/** € 1.234,56 (formato argentino, en euros) */
+export const money = (n: number) => `${n < 0 ? '−' : ''}€ ${num(Math.abs(n), 2)}`
+/** € 1.235 (sin decimales, para resúmenes) */
+export const money0 = (n: number) => `${Math.round(n) < 0 ? '−' : ''}€ ${num(Math.abs(Math.round(n)))}`
 
 export const pct = (n: number) => `${Math.round(n)} %`
 
