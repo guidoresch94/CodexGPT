@@ -1,4 +1,3 @@
-import { Check, Settings as Gear } from 'lucide-react'
 import { useMemo } from 'react'
 import { Area, AreaChart, Line, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { go } from '../../app/router'
@@ -6,16 +5,16 @@ import { useActions } from '../../app/actions'
 import { db } from '../../db/schema'
 import type { AppData } from '../../db/hooks'
 import { alerts, fundBalance, monthPace, monthSummary, recurringStatus, savingsPlan, type Alert } from '../../lib/calc'
-import { fmtDayLong, monthKey, today } from '../../lib/dates'
+import { monthKey, today } from '../../lib/dates'
 import { money, money0, pct, uid } from '../../lib/format'
-import { dayTotal, moneyScore, quitSavings, streakDays, streakWeeks, UNIT_LABEL, weekProgress, weekScore } from '../../lib/habits'
+import { moneyScore, quitSavings, streakDays, streakWeeks, weekScore } from '../../lib/habits'
 import { RING_COLORS, Rings } from '../../components/Rings'
 import { useToast } from '../../components/Toast'
-import { Card, CatIcon, cx, List, PageHeader, ProgressBar, SectionTitle } from '../../components/ui'
-import { useHabitTap } from '../habitos/useHabitTap'
+import { Card, CatIcon, cx, List, ProgressBar, SectionTitle } from '../../components/ui'
 import { goalProgress } from '../objetivos/Objetivos'
 import { currentFocus, reviewDue } from './Review'
-import { GameCard, TodayTasks, useGame } from './Game'
+import { ChallengeCard, TodayTasks, useGame } from './Game'
+import { HabitBubbles, Hero, MonthColors } from './Visual'
 
 export function Dashboard({ data }: { data: AppData }) {
   const { settings, transactions, categories, recurrings, funds } = data
@@ -32,42 +31,36 @@ export function Dashboard({ data }: { data: AppData }) {
 
   return (
     <div>
-      <PageHeader
-        subtitle={fmtDayLong(today())}
-        title={`Hola, ${settings.name}`}
-        right={
-          <button onClick={() => go('ajustes')} className="mb-1.5 grid h-9 w-9 place-items-center rounded-full bg-ios-card text-slate-500" aria-label="Ajustes">
-            <Gear size={19} />
-          </button>
-        }
-      />
+      <Hero data={data} pace={pace} g={game} />
 
-      <GameCard g={game} />
+      <SectionTitle action={<button onClick={() => go('habitos')} className="text-[15px] text-accent">Ver todos</button>}>Hoy</SectionTitle>
+      <HabitBubbles data={data} />
 
-      <Card onClick={() => go('habitos')} className="mt-3 flex items-center gap-5">
+      <Card onClick={() => go('habitos')} className="mt-2 flex items-center gap-5">
         <Rings
-          size={112}
+          size={104}
           rings={[
             { value: score.habitPct, color: RING_COLORS.habitos, label: 'Hábitos' },
             { value: score.money, color: RING_COLORS.gasto, label: 'Gasto' },
             { value: savingGoal > 0 ? m.saved / savingGoal : 0, color: RING_COLORS.ahorro, label: 'Ahorro' },
           ]}
         />
-        <div className="min-w-0 flex-1 space-y-2.5">
+        <div className="min-w-0 flex-1 space-y-2">
           <RingRow color={RING_COLORS.habitos} label="Hábitos" value={pct(score.habitPct * 100)} hint="de lo esperado a hoy" />
-          <RingRow color={RING_COLORS.gasto} label="Gasto" value={pct(score.money * 100)} hint="al ritmo del presupuesto" />
-          <RingRow color={RING_COLORS.ahorro} label="Ahorro" value={money0(m.saved)} hint={savingGoal > 0 ? `de ${money0(savingGoal)} este mes` : 'este mes'} />
+          <RingRow color={RING_COLORS.gasto} label="Gasto" value={pct(score.money * 100)} hint="al ritmo" />
+          <RingRow color={RING_COLORS.ahorro} label="Ahorro" value={money0(m.saved)} hint={savingGoal > 0 ? `de ${money0(savingGoal)}` : 'este mes'} />
         </div>
       </Card>
 
+      <ChallengeCard g={game} />
       <FocusCard data={data} />
       <TodayTasks data={data} />
 
-      <SectionTitle action={<button onClick={() => go('presupuesto')} className="text-[15px] text-accent">Presupuesto</button>}>Para el día a día</SectionTitle>
-      <SpendCard pace={pace} />
-
-      <SectionTitle action={<button onClick={() => go('habitos')} className="text-[15px] text-accent">Ver todos</button>}>Hábitos de hoy</SectionTitle>
-      <TodayHabits data={data} />
+      <SectionTitle action={<button onClick={() => go('presupuesto')} className="text-[15px] text-accent">Presupuesto</button>}>Tu mes</SectionTitle>
+      <MonthColors data={data} />
+      <div className="mt-3">
+        <SpendCard pace={pace} />
+      </div>
 
       {pending.length > 0 && <PendingList data={data} items={pending} />}
 
@@ -177,27 +170,16 @@ function Tile({ label, value, hint, tone }: { label: string; value: string; hint
 
 /** Lo que te queda para el día a día y la curva del mes frente al ritmo ideal */
 function SpendCard({ pace }: { pace: ReturnType<typeof monthPace> }) {
-  const { openTx } = useActions()
-  const over = pace.remaining < 0
   const ahead = pace.vsPace >= 0
   return (
     <Card>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className={cx('text-[34px] font-bold leading-none tracking-tight tabular-nums', over && 'text-red-500')}>{money(pace.remaining)}</p>
-          <p className="mt-1.5 text-[15px] text-slate-500">
-            {over ? 'Te pasaste del presupuesto variable' : (
-              <>
-                Podés gastar <b className="font-semibold text-slate-950 tabular-nums dark:text-white">{money(pace.perDayAllowed)}</b> por día · {pace.daysLeft} {pace.daysLeft === 1 ? 'día' : 'días'}
-              </>
-            )}
-          </p>
-        </div>
-        <button onClick={() => openTx()} className="shrink-0 rounded-full bg-accent px-4 py-2 text-[15px] font-semibold text-white active:opacity-70">
-          Gasto
-        </button>
+      <div className="flex items-baseline justify-between">
+        <p className="text-[17px] font-semibold">Ritmo del mes</p>
+        <p className="text-[13px] text-slate-500">
+          {money0(pace.spent)} de {money0(pace.budget)}
+        </p>
       </div>
-      <span className={cx('mt-3 inline-block rounded-full px-2.5 py-1 text-[12px] font-semibold', ahead ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : 'bg-amber-500/15 text-amber-700 dark:text-amber-300')}>
+      <span className={cx('mt-2 inline-block rounded-full px-2.5 py-1 text-[12px] font-semibold', ahead ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : 'bg-amber-500/15 text-amber-700 dark:text-amber-300')}>
         {ahead ? `${money0(pace.vsPace)} por debajo del ritmo` : `${money0(-pace.vsPace)} por encima del ritmo`}
       </span>
       <div className="mt-2 h-28">
@@ -248,42 +230,6 @@ function FocusCard({ data }: { data: AppData }) {
   )
 }
 
-function TodayHabits({ data }: { data: AppData }) {
-  const tap = useHabitTap(data)
-  const now = today()
-  const active = data.habits.filter((h) => h.active)
-  if (!active.length)
-    return (
-      <Card onClick={() => go('habitos')}>
-        <p className="text-[15px] text-slate-500">Creá tu primer hábito para registrarlo desde acá.</p>
-      </Card>
-    )
-  return (
-    <Card className="grid grid-cols-4 gap-x-1 gap-y-3 px-2 py-3">
-      {active.map((h) => {
-        const logs = data.byHabit.get(h.id) ?? []
-        const done = dayTotal(h, logs, now) > 0
-        const p = weekProgress(h, logs)
-        return (
-          <button key={h.id} onClick={() => tap(h)} className="flex flex-col items-center gap-1 rounded-2xl p-1 active:scale-95">
-            <span className="relative grid h-[52px] w-[52px] place-items-center rounded-full text-[22px] transition" style={{ background: done ? h.color : `${h.color}24` }}>
-              {h.icon}
-              {done && (
-                <span className="absolute -bottom-0.5 -right-0.5 grid h-[18px] w-[18px] place-items-center rounded-full bg-white text-emerald-500 shadow ring-2 ring-white dark:bg-slate-900 dark:ring-slate-900">
-                  <Check size={11} strokeWidth={3.5} />
-                </span>
-              )}
-            </span>
-            <span className="line-clamp-1 max-w-full text-[11px] font-medium">{h.name}</span>
-            <span className={cx('text-[11px] tabular-nums', p.met ? 'font-semibold text-emerald-600 dark:text-emerald-400' : 'text-slate-500')}>
-              {h.auto ? `${streakDays(h, logs)} d` : `${Math.round(p.done * 10) / 10}/${p.target}${h.unit !== 'veces' && h.unit !== 'si_no' ? ` ${UNIT_LABEL[h.unit]}` : ''}`}
-            </span>
-          </button>
-        )
-      })}
-    </Card>
-  )
-}
 
 /** Logros: rachas, plata ahorrada por dejar algo y días sin gastos variables */
 function achievements(data: AppData, noSpendDays: number): Alert[] {

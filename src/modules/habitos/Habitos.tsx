@@ -6,7 +6,8 @@ import { monthKey, today, weekDays, weekdayInitial } from '../../lib/dates'
 import { money0, num } from '../../lib/format'
 import { dayTotal, moneyScore, quitSavings, streakDays, streakWeeks, UNIT_LABEL, weekProgress, weekScore } from '../../lib/habits'
 import type { Habit, HabitLog } from '../../types'
-import { RING_COLORS, Rings } from '../../components/Rings'
+import { Rings } from '../../components/Rings'
+import { burst, CountUp, Ring } from '../../components/Fx'
 import { Card, cx, Empty, PageHeader, SectionTitle, Sheet } from '../../components/ui'
 import { HabitDetail } from './HabitDetail'
 import { HabitEditor } from './HabitEditor'
@@ -33,16 +34,22 @@ export function Habitos({ data }: { data: AppData }) {
         }
       />
 
-      <Card className="flex items-center gap-5">
-        <Rings size={96} rings={[{ value: score.habitPct, color: RING_COLORS.habitos, label: 'Hábitos' }, { value: score.money, color: RING_COLORS.gasto, label: 'Gasto' }]} />
-        <div className="min-w-0 flex-1">
-          <p className="text-[40px] font-bold leading-none tabular-nums">{score.score}</p>
-          <p className="mt-1 text-[15px] font-semibold">Puntos de la semana</p>
-          <p className="text-[13px] text-slate-500">
-            {metCount} de {active.length} objetivos cumplidos · 70 pts hábitos + 30 gasto
-          </p>
+      <div className="relative flex items-center gap-5 overflow-hidden rounded-[28px] p-5 text-white shadow-[0_18px_40px_-12px_rgba(255,45,85,0.55)]" style={{ background: 'linear-gradient(135deg,#ff2d55 0%,#ff6b3d 55%,#ffb340 100%)' }}>
+        <span className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/20 blur-2xl" />
+        <div className="relative rounded-full bg-black/10 p-1.5">
+          <Rings size={92} rings={[{ value: score.habitPct, color: '#ffffff', label: 'Hábitos' }, { value: score.money, color: '#ffe066', label: 'Gasto' }]} />
         </div>
-      </Card>
+        <div className="relative min-w-0 flex-1">
+          <p className="text-[48px] font-bold leading-none tabular-nums">
+            <CountUp value={score.score} format={(n) => String(Math.round(n))} />
+          </p>
+          <p className="mt-1 text-[15px] font-semibold">Puntos de la semana</p>
+          <p className="text-[13px] text-white/85">
+            {metCount} de {active.length} objetivos cumplidos
+          </p>
+          <p className="mt-1 text-[11px] text-white/70">Blanco: hábitos (70 pts) · Amarillo: gasto al ritmo (30 pts)</p>
+        </div>
+      </div>
 
       <SectionTitle>Esta semana</SectionTitle>
       {active.length === 0 ? (
@@ -103,9 +110,11 @@ export function HabitCard({ habit: h, logs, data, onOpen }: { habit: Habit; logs
     <Card className="p-3.5">
       <div className="flex items-center gap-3">
         <button onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-[21px]" style={{ background: `${h.color}24` }}>
-            {h.icon}
-          </span>
+          <Ring value={h.auto ? Math.min(1, streak / 30) : p.pct} size={54} stroke={5} color={h.color}>
+            <span className="grid h-[40px] w-[40px] place-items-center rounded-full text-[20px]" style={{ background: `${h.color}24` }}>
+              {h.icon}
+            </span>
+          </Ring>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <p className="truncate text-[17px] font-semibold">{h.name}</p>
@@ -123,7 +132,10 @@ export function HabitCard({ habit: h, logs, data, onOpen }: { habit: Habit; logs
           </div>
         </button>
         <button
-          onClick={() => tap(h)}
+          onClick={(e) => {
+            if (!(doneToday && (h.unit === 'si_no' || h.auto))) burst(e.clientX, e.clientY, h.color)
+            tap(h)
+          }}
           aria-label={h.auto ? (doneToday ? `Anotar recaída en ${h.name}` : `Quitar recaída de ${h.name}`) : `Registrar ${h.name}`}
           className={cx(
             'grid h-11 w-11 shrink-0 place-items-center rounded-full transition active:scale-90',

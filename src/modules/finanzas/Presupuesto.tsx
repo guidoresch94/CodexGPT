@@ -8,6 +8,7 @@ import { level, monthSummary, monthTxs, savedByCategory, spentByCategory } from 
 import { fmtMonthShort, monthKey, shiftMonth, today } from '../../lib/dates'
 import { money, money0, pct } from '../../lib/format'
 import type { Category } from '../../types'
+import { Ring } from '../../components/Fx'
 import { Card, CatIcon, cx, levelText, MonthSwitcher, PageHeader, ProgressBar, SectionTitle, Sheet } from '../../components/ui'
 import { CategoryEditor } from './CategoryEditor'
 
@@ -44,6 +45,33 @@ export function Presupuesto({ data }: { data: AppData }) {
       }),
     [transactions, categories, recurrings, settings, month],
   )
+
+  const LEVEL_COLOR = { ok: '#34c759', warn: '#ff9500', over: '#ff3b30' }
+  const tile = (c: Category) => {
+    const spent = m.byRoot.get(c.id) ?? 0
+    const lvl = c.type === 'fijo' && spent <= c.monthlyBudget ? 'ok' : level(spent, c.monthlyBudget)
+    const ratio = c.monthlyBudget > 0 ? spent / c.monthlyBudget : spent > 0 ? 1 : 0
+    return (
+      <div key={c.id} className="press relative rounded-[22px] bg-ios-card p-3.5">
+        <button onClick={() => go('movimientos', c.id)} className="block w-full text-left">
+          <Ring value={ratio} size={58} stroke={6} color={LEVEL_COLOR[lvl]}>
+            <span className="text-[24px]">{c.icon}</span>
+          </Ring>
+          <p className="mt-2 line-clamp-1 text-[15px] font-semibold">{c.name}</p>
+          <p className="text-[17px] font-bold tabular-nums" style={{ color: lvl === 'ok' ? undefined : LEVEL_COLOR[lvl] }}>
+            {money0(spent)}
+            {c.monthlyBudget > 0 && <span className="text-[13px] font-normal text-slate-500"> / {money0(c.monthlyBudget)}</span>}
+          </p>
+          <p className="text-[12px] text-slate-500">
+            {c.monthlyBudget <= 0 ? 'Sin límite' : spent <= c.monthlyBudget ? `Quedan ${money0(c.monthlyBudget - spent)}` : `Te pasaste ${money0(spent - c.monthlyBudget)}`}
+          </p>
+        </button>
+        <button onClick={() => setEdit(c)} className="absolute right-2.5 top-2.5 grid h-7 w-7 place-items-center rounded-full bg-ios-fill text-slate-500" aria-label={`Editar ${c.name}`}>
+          <Pencil size={13} />
+        </button>
+      </div>
+    )
+  }
 
   const row = (c: Category) => {
     const spent = m.byRoot.get(c.id) ?? 0
@@ -151,7 +179,7 @@ export function Presupuesto({ data }: { data: AppData }) {
       </Card>
 
       <SectionTitle>Gastos</SectionTitle>
-      <Card className="divide-y divide-slate-100 py-1 dark:divide-white/5">{expenseRoots.map(row)}</Card>
+      <div className="grid grid-cols-2 gap-2.5">{expenseRoots.map(tile)}</div>
 
       {reduceRoots.length > 0 && (
         <>
@@ -197,8 +225,8 @@ export function Presupuesto({ data }: { data: AppData }) {
             <BarChart data={history} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
               <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={11} stroke="#94a3b8" />
               <Tooltip formatter={(v, n) => [money0(Number(v)), n === 'gasto' ? 'Gasto' : 'Ahorrado']} cursor={{ fill: '#94a3b822' }} contentStyle={{ borderRadius: 12, fontSize: 12 }} />
-              <Bar dataKey="gasto" radius={[6, 6, 0, 0]} fill="#f97316" />
-              <Bar dataKey="ahorro" radius={[6, 6, 0, 0]} fill="#38bdf8" />
+              <Bar dataKey="gasto" radius={[6, 6, 0, 0]} fill="#f97316" isAnimationActive={false} />
+              <Bar dataKey="ahorro" radius={[6, 6, 0, 0]} fill="#38bdf8" isAnimationActive={false} />
             </BarChart>
           </ResponsiveContainer>
         </div>

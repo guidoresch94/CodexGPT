@@ -6,7 +6,7 @@ import { commitImport } from '../../db/importTx'
 import { fmtDate } from '../../lib/dates'
 import { money, money0, num } from '../../lib/format'
 import { classifyRows, isAlreadyImported, parseBankRows, type Classified } from '../../lib/importer'
-import { readSpreadsheet } from '../../lib/xlsx'
+import { readDelimited, readSpreadsheet } from '../../lib/xlsx'
 import type { Category } from '../../types'
 import { Button, Card, cx, List, PageHeader, SectionTitle } from '../../components/ui'
 import { useToast } from '../../components/Toast'
@@ -47,16 +47,25 @@ export function Importar({ data }: { data: AppData }) {
   const [result, setResult] = useState<Awaited<ReturnType<typeof commitImport>> | null>(null)
   const [busy, setBusy] = useState(false)
 
+  const [pasted, setPasted] = useState('')
+  const [dragging, setDragging] = useState(false)
+
   const onFile = async (file?: File) => {
     if (!file) return
+    await load(() => file.arrayBuffer().then(readSpreadsheet), file.name)
+  }
+
+  const onPasteText = () => load(async () => readDelimited(pasted), 'Filas pegadas')
+
+  const load = async (getRows: () => Promise<ReturnType<typeof readDelimited>>, name: string) => {
     setError('')
     try {
-      const rows = readSpreadsheet(await file.arrayBuffer())
+      const rows = await getRows()
       const bank = parseBankRows(rows)
       if (!bank.length) throw new Error('El archivo no tiene movimientos.')
       const classified = classifyRows(bank, data.categories, data.settings.merchantRules ?? {}, data.transactions)
       setItems(classified)
-      setFileName(file.name)
+      setFileName(name)
       setByKey({})
       setTouched(new Set())
       setStage('review')
@@ -155,21 +164,50 @@ export function Importar({ data }: { data: AppData }) {
 
       {stage === 'pick' && (
         <>
-          <Card className="text-center">
-            <span className="mx-auto grid h-14 w-14 place-items-center rounded-[16px] bg-emerald-500 text-white">
-              <FileSpreadsheet size={28} />
+          <div className="overflow-hidden rounded-[28px] p-5 text-white shadow-[0_18px_40px_-12px_rgba(52,199,89,0.5)]" style={{ background: 'linear-gradient(135deg,#34c759 0%,#00b386 50%,#0a84ff 100%)' }}>
+            <span className="grid h-12 w-12 place-items-center rounded-[14px] bg-white/20 backdrop-blur">
+              <FileSpreadsheet size={26} />
             </span>
-            <p className="mt-3 text-[17px] font-semibold">Subí el Excel de tu banco</p>
-            <p className="mt-1 text-[15px] text-slate-500">Lo leo, lo clasifico y vos solo revisás lo que no tengo claro. Lo que me enseñes, lo recuerdo para la próxima.</p>
-            <Button className="mt-4 w-full" onClick={() => fileRef.current?.click()}>
+            <p className="mt-3 text-[22px] font-bold leading-tight">Pegá los movimientos del banco</p>
+            <p className="mt-1 text-[15px] text-white/85">Abrí el Excel, seleccioná las filas, copiá y pegalas acá. Lo clasifico solo y vos revisás lo dudoso.</p>
+            <textarea
+              id="paste-rows"
+              value={pasted}
+              onChange={(e) => setPasted(e.target.value)}
+              rows={4}
+              placeholder="Mantené apretado y elegí Pegar…"
+              className="mt-4 w-full resize-none rounded-[16px] bg-white/95 p-3 font-mono text-[12px] leading-snug text-slate-900 outline-none placeholder:font-sans placeholder:text-[15px] placeholder:text-slate-400"
+            />
+            <button onClick={onPasteText} disabled={!pasted.trim()} className="press mt-3 w-full rounded-[14px] bg-white py-3 text-[17px] font-semibold text-emerald-700 disabled:opacity-60">
+              Leer movimientos
+            </button>
+            {error && <p className="mt-3 rounded-[12px] bg-white/90 px-3 py-2 text-[13px] text-red-600">{error}</p>}
+          </div>
+
+          <div
+            onDragOver={(e) => {
+              e.preventDefault()
+              setDragging(true)
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault()
+              setDragging(false)
+              onFile(e.dataTransfer.files?.[0])
+            }}
+            className={cx('mt-3 flex items-center gap-3 rounded-[22px] border-2 border-dashed p-4 transition', dragging ? 'border-accent bg-accent/10' : 'border-slate-300 bg-ios-card dark:border-slate-700')}
+          >
+            <span className="text-[26px]">📄</span>
+            <span className="flex-1 text-[13px] text-slate-500">En el ordenador también podés arrastrar el archivo .xlsx acá o</span>
+            <button onClick={() => fileRef.current?.click()} className="rounded-full bg-ios-fill px-3.5 py-2 text-[13px] font-semibold text-accent">
               Elegir archivo
-            </Button>
+            </button>
             <input ref={fileRef} type="file" accept=".xlsx,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
-            {error && <p className="mt-3 text-[13px] text-red-500">{error}</p>}
-          </Card>
-          <SectionTitle>Cómo bajarlo de BBVA</SectionTitle>
+          </div>
+
+          <SectionTitle>Cómo copiarlo de BBVA</SectionTitle>
           <List>
-            {['Entrá en bbva.es desde el ordenador (o la app)', 'Cuentas → tu cuenta → Movimientos', 'Elegí las fechas (por ejemplo, el último mes)', 'Tocá Descargar → Excel', 'Subilo acá. Si repetís fechas, no se duplica nada'].map((t, i) => (
+            {['En bbva.es o la app: Cuentas → Movimientos', 'Descargá el Excel y abrilo (Excel, Numbers o Google Sheets)', 'Seleccioná desde la fila de títulos (Fecha, Concepto, Importe…) hasta el final', 'Copiá y pegá arriba. Si repetís fechas, no se duplica nada'].map((t, i) => (
               <div key={t} className="flex items-center gap-3 px-4 py-3 text-[15px]">
                 <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-ios-fill text-[13px] font-semibold">{i + 1}</span>
                 {t}

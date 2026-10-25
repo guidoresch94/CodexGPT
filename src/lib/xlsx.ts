@@ -56,7 +56,8 @@ function readXlsx(bytes: Uint8Array): Rows {
   return rows
 }
 
-function readDelimited(text: string): Rows {
+/** Texto con columnas (CSV, o celdas copiadas de Excel/Numbers/Sheets, que llegan separadas por tabuladores) */
+export function readDelimited(text: string): Rows {
   const lines = text.replace(/^﻿/, '').split(/\r?\n/).filter((l) => l.trim())
   const sep = [';', '\t', ','].sort((a, b) => (lines[0]?.split(b).length ?? 0) - (lines[0]?.split(a).length ?? 0))[0]
   return lines.map((l) => {

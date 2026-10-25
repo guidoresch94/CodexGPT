@@ -157,9 +157,25 @@ function GoalCard({ goal: g, data, onOpen }: { goal: Goal; data: AppData; onOpen
       </div>
       {p && (
         <div className="px-4 pb-4">
-          <ProgressBar value={p.value} max={p.target} color={isDone || p.value >= p.target ? '#34c759' : '#ff9500'} />
+          {!hasSteps && <ProgressBar value={p.value} max={p.target} color={isDone || p.value >= p.target ? '#34c759' : '#ff9500'} />}
           <p className="mt-1.5 text-[13px] text-slate-500">{p.label}</p>
           {p.extra && <p className="text-[13px] font-medium text-emerald-600 dark:text-emerald-400">{p.extra}</p>}
+        </div>
+      )}
+      {hasSteps && (
+        <div className="flex items-center px-5 pb-4">
+          {g.steps!.map((st, i) => (
+            <div key={st.id} className="flex flex-1 items-center last:flex-none">
+              <span
+                className={cx('grid h-7 w-7 shrink-0 place-items-center rounded-full text-[12px] font-bold transition-all duration-500', st.done ? 'bg-emerald-500 text-white shadow-[0_0_0_4px_rgba(52,199,89,0.18)]' : 'bg-ios-fill text-slate-500')}
+                title={st.text}
+              >
+                {st.done ? '✓' : i + 1}
+              </span>
+              {i < g.steps!.length - 1 && <span className={cx('mx-1 h-[3px] flex-1 rounded-full transition-colors duration-500', st.done ? 'bg-emerald-500' : 'bg-ios-fill')} />}
+            </div>
+          ))}
+          <span className="ml-2 text-[20px]">🏁</span>
         </div>
       )}
       {hasSteps && (

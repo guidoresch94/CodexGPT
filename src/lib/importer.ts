@@ -94,7 +94,7 @@ export function parseBankRows(rows: Rows): BankRow[] {
     const t = r.map((c) => norm(String(c ?? '')))
     return t.some((c) => c === 'importe' || c === 'cantidad') && t.some((c) => c.startsWith('concepto') || c.startsWith('descrip'))
   })
-  if (headerIdx < 0) throw new Error('No encontré las columnas Fecha, Concepto e Importe. ¿Es el extracto de movimientos del banco?')
+  if (headerIdx < 0) return guessRows(rows)
   const h = rows[headerIdx].map((c) => norm(String(c ?? '')))
   const col = (...names: string[]) => h.findIndex((c) => names.some((n) => c === n || c.startsWith(n)))
   const iDate = col('fecha valor', 'fecha operacion', 'fecha')
@@ -112,6 +112,32 @@ export function parseBankRows(rows: Rows): BankRow[] {
     const detail = [r[iDetail], r[iObs]].filter((x) => x && String(x).trim()).join(' · ')
     out.push({ date, concept, detail, amount: round2(amount) })
   }
+  return out
+}
+
+/**
+ * Sin cabecera (copiaste solo unas filas): adivina las columnas por su contenido.
+ * Fecha = celda con dd/mm/aaaa; importe = número con signo o decimales; concepto = el primer texto.
+ */
+function guessRows(rows: Rows): BankRow[] {
+  const out: BankRow[] = []
+  for (const r of rows) {
+    const cells = r.map((c) => (c === null ? '' : c))
+    const iDate = cells.findIndex((c) => !!toISODate(c) && /\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|^\d{5}$/.test(String(c)))
+    if (iDate < 0) continue
+    const numeric = cells.map((c, i) => ({ i, n: i === iDate ? undefined : toAmount(c), raw: String(c) })).filter((x) => x.n !== undefined && /[.,]\d{1,2}$|^-/.test(x.raw.trim()))
+    // El primer importe suele ser el movimiento; el último, el saldo
+    const amount = numeric[0]?.n
+    const texts = cells
+      .map((c, i) => ({ i, t: String(c).trim() }))
+      // En el orden del banco: primero el concepto, después el detalle
+      .filter((x) => x.i !== iDate && x.t && toAmount(x.t) === undefined && !toISODate(x.t) && !/^(eur|€)$/i.test(x.t))
+    if (amount === undefined || amount === 0 || !texts.length) continue
+    const concept = texts[0].t
+    const detail = texts.slice(1).map((x) => x.t).join(' · ')
+    out.push({ date: toISODate(cells[iDate])!, concept, detail, amount: round2(amount) })
+  }
+  if (!out.length) throw new Error('No encontré movimientos. Copiá las filas con fecha, concepto e importe.')
   return out
 }
 

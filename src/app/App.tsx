@@ -85,7 +85,7 @@ function Shell() {
 
   return (
     <ActionsCtx.Provider value={{ openTx, openHabitLog, openReview }}>
-      <main className="mx-auto min-h-dvh max-w-lg px-4 pb-28 pt-[max(env(safe-area-inset-top),8px)]">{pages[route]}</main>
+      <main className="mx-auto min-h-dvh max-w-lg px-4 pb-28 pt-[max(env(safe-area-inset-top),8px)]"><div key={route + (param ?? '')} className="animate-page">{pages[route]}</div></main>
       <BottomNav route={route} onAdd={() => openTx()} />
       <GameLayer data={data} />
       <Sheet open={!!tx} onClose={closeTx} title={tx?.id ? 'Editar movimiento' : 'Nuevo movimiento'} full>
@@ -117,9 +117,11 @@ function BottomNav({ route, onAdd }: { route: Route; onAdd: () => void }) {
     <button
       key={n.route}
       onClick={() => go(n.route)}
-      className={cx('flex flex-1 flex-col items-center gap-[3px] pb-1 pt-2 text-[10px] font-medium', active(n.route) ? 'text-accent' : 'text-slate-500')}
+      className={cx('press flex flex-1 flex-col items-center gap-[3px] pb-1 pt-1.5 text-[10px] font-medium', active(n.route) ? 'text-accent' : 'text-slate-500')}
     >
-      <n.icon size={25} strokeWidth={active(n.route) ? 2.3 : 1.7} />
+      <span className={cx('grid h-8 w-12 place-items-center rounded-full transition-colors duration-300', active(n.route) && 'bg-accent/12')}>
+        <n.icon size={23} strokeWidth={active(n.route) ? 2.3 : 1.7} />
+      </span>
       {n.label}
     </button>
   )

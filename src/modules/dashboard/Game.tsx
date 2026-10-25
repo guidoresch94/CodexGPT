@@ -8,6 +8,7 @@ import { num } from '../../lib/format'
 import { gameState, XP, type GameState } from '../../lib/game'
 import { dayTotal } from '../../lib/habits'
 import { Card, cx, List, SectionTitle, Sheet } from '../../components/ui'
+import { Ring } from '../../components/Fx'
 import { reviewDue } from './Review'
 
 export function useGame(data: AppData) {
@@ -67,7 +68,7 @@ export function GameCard({ g }: { g: GameState }) {
   )
 }
 
-function Logros({ g }: { g: GameState }) {
+export function Logros({ g }: { g: GameState }) {
   const earned = g.badges.filter((b) => b.earned).length
   return (
     <div className="space-y-5">
@@ -240,6 +241,27 @@ function Confetti() {
           style={{ left: `${p.left}%`, background: p.color, transform: `rotate(${p.rot}deg)`, animation: `confetti ${p.dur}s ${p.delay}s ease-in forwards` }}
         />
       ))}
+    </div>
+  )
+}
+
+/** Desafío de la semana como tarjeta propia */
+export function ChallengeCard({ g }: { g: GameState }) {
+  const c = g.challenge
+  if (!c) return null
+  const tone = c.failed ? '#ff3b30' : c.done ? '#34c759' : '#5856d6'
+  return (
+    <div className="mt-3 flex items-center gap-3.5 overflow-hidden rounded-[22px] bg-ios-card p-4">
+      <Ring value={c.progress} size={58} stroke={6} color={tone}>
+        <span className="text-[24px]">{c.icon}</span>
+      </Ring>
+      <div className="min-w-0 flex-1">
+        <p className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: tone }}>
+          Desafío de la semana · +{XP.challenge} pts
+        </p>
+        <p className="text-[17px] font-semibold leading-snug">{c.title}</p>
+        <p className="text-[13px] text-slate-500">{c.done ? '¡Logrado! 🎉' : c.failed ? 'Esta semana no salió. El lunes hay otro.' : c.detail}</p>
+      </div>
     </div>
   )
 }

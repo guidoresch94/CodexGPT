@@ -9,7 +9,8 @@ import { money, money0, parseAmount, pct, round2, uid } from '../../lib/format'
 import type { Fund } from '../../types'
 import { ColorPicker, EmojiPicker } from '../../components/Pickers'
 import { useToast } from '../../components/Toast'
-import { Button, Card, CatIcon, cx, Empty, Field, Input, List, ProgressBar, SectionTitle, Sheet } from '../../components/ui'
+import { CountUp, Ring } from '../../components/Fx'
+import { Button, Card, cx, Empty, Field, Input, List, ProgressBar, SectionTitle, Sheet } from '../../components/ui'
 import { TxRow } from '../finanzas/Movimientos'
 
 export function Ahorros({ data }: { data: AppData }) {
@@ -114,14 +115,19 @@ function FundCard({ fund: f, data, onClick }: { fund: Fund; data: AppData; onCli
   const need = monthlyNeeded(f, b)
   const eta = fundEta(f, b, data.transactions)
   return (
-    <Card onClick={onClick}>
-      <div className="flex items-center gap-3">
-        <CatIcon icon={f.icon} color={f.color} size="lg" />
+    <Card onClick={onClick} className="relative overflow-hidden">
+      <span className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full blur-2xl" style={{ background: `${f.color}33` }} />
+      <div className="relative flex items-center gap-3.5">
+        <Ring value={f.target ? b / f.target : 0} size={64} stroke={6} color={f.color}>
+          <span className="text-[26px]">{f.icon}</span>
+        </Ring>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[17px] font-semibold">{f.name}</p>
+          <p className="text-[24px] font-bold leading-tight tabular-nums">
+            <CountUp value={b} format={money0} />
+          </p>
           <p className="text-[13px] text-slate-500">{f.target ? `${pct((b / f.target) * 100)} de ${money0(f.target)}` : 'Sin meta'}</p>
         </div>
-        <p className="text-[20px] font-semibold tabular-nums">{money0(b)}</p>
       </div>
       {f.target ? (
         <div className="mt-3">

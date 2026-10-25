@@ -3,6 +3,8 @@
 App personal de Guido (Barcelona). Requisitos completos en [`docs/PRD.md`](docs/PRD.md).
 
 - Textos en **español rioplatense (voseo)**, moneda **EUR** con formato argentino (`€ 1.234,56`, ver `lib/format.ts`), fechas DD/MM/AAAA, semana empieza en **lunes**.
+- El visor de Claude puede bloquear selector de archivos y cámara: la vía principal para importar es **pegar** (celdas copiadas de Excel → `readDelimited` → `parseBankRows`, que adivina columnas si no hay cabecera); las capturas se pegan como imagen en «Cargar con IA».
+- Componentes visuales en `components/Fx.tsx` (CountUp, Ring, burst, skyGradient).
 - Estilo visual Apple/iOS: grises agrupados, colores del sistema (paletas de Tailwind sobrescritas en `index.css`), anillos tipo Fitness. Se dice "ahorro", nunca "hucha".
 - Stack: Vite + React + TypeScript + Tailwind v4 + Recharts + Dexie (IndexedDB) + vite-plugin-pwa.
 - Local-first: sin backend, login, nube ni IA (salvo que se pida).

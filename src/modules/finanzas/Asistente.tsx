@@ -113,6 +113,14 @@ export function Asistente({ data }: { data: AppData }) {
               id="ai-text"
               value={text}
               onChange={(e) => setText(e.target.value)}
+              onPaste={(e) => {
+                // Una captura o foto copiada: se pega como imagen para la IA
+                const imgs = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith('image/'))
+                if (imgs.length && canImages) {
+                  e.preventDefault()
+                  setImages((prev) => [...prev, ...imgs].slice(0, 4))
+                }
+              }}
               rows={6}
               placeholder="Escribí o pegá lo que quieras: notas, mensajes, filas de un Excel… Ej.: «ayer 12 € pádel con Tomás, 25 súper Lidl, me devolvieron 8 de las birras»"
               className="w-full resize-none rounded-t-[22px] bg-transparent p-4 text-[17px] leading-snug outline-none placeholder:text-slate-400"
@@ -121,7 +129,7 @@ export function Asistente({ data }: { data: AppData }) {
               <div className="flex flex-wrap gap-2 px-4 pb-2">
                 {images.map((f, i) => (
                   <span key={i} className="flex items-center gap-1 rounded-full bg-ios-fill py-1 pl-3 pr-1.5 text-[13px]">
-                    📷 {f.name.slice(0, 18)}
+                    📷 {(f.name || 'captura').slice(0, 18)}
                     <button onClick={() => setImages(images.filter((_, j) => j !== i))} aria-label="Quitar foto" className="rounded-full p-0.5">
                       <X size={13} />
                     </button>
@@ -133,11 +141,12 @@ export function Asistente({ data }: { data: AppData }) {
               {canImages && (
                 <>
                   <button onClick={() => fileRef.current?.click()} className="flex items-center gap-1.5 rounded-full bg-ios-fill px-3.5 py-2 text-[15px] font-medium text-accent">
-                    <Camera size={17} /> Ticket
+                    <Camera size={17} /> Foto
                   </button>
                   <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => setImages([...images, ...Array.from(e.target.files ?? [])].slice(0, 4))} />
                 </>
               )}
+              {canImages && <span className="text-[12px] leading-tight text-slate-400">o pegá una captura</span>}
               <div className="flex-1" />
               {busy ? (
                 <Button variant="soft" onClick={() => ctl.current?.abort()}>

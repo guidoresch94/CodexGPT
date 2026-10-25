@@ -5,8 +5,9 @@ import { go } from '../../app/router'
 import type { AppData } from '../../db/hooks'
 import { GastosTabs } from './GastosTabs'
 import { download, transactionsXlsx } from '../../db/backup'
-import { monthTxs, net, rootId } from '../../lib/calc'
-import { fmtDayLong, monthKey, today } from '../../lib/dates'
+import { isBudgetExpense, monthTxs, net, rootId } from '../../lib/calc'
+import { CountUp } from '../../components/Fx'
+import { fmtDayLong, monthKey, monthRange, today } from '../../lib/dates'
 import { money } from '../../lib/format'
 import type { Transaction } from '../../types'
 import { prettyMerchant } from '../../lib/importer'
@@ -16,9 +17,14 @@ type KindFilter = 'todo' | 'gasto' | 'ingreso' | 'transferencia'
 
 export function Movimientos({ data, filter }: { data: AppData; filter?: string }) {
   const { openTx } = useActions()
-  const [month, setMonth] = useState(monthKey(today()))
+  const [month, setMonthRaw] = useState(monthKey(today()))
+  const setMonth = (m: string) => {
+    setMonthRaw(m)
+    setDay(null)
+  }
   const [q, setQ] = useState('')
   const [kind, setKind] = useState<KindFilter>('todo')
+  const [day, setDay] = useState<string | null>(null)
   const { catMap, fundMap } = data
   const filterCat = filter ? catMap.get(filter) : undefined
   const onlyUnclassified = filter === 'sin-clasificar'
@@ -28,6 +34,7 @@ export function Movimientos({ data, filter }: { data: AppData; filter?: string }
     const base = onlyUnclassified ? data.transactions.filter((t) => t.kind === 'gasto' && !t.categoryId) : monthTxs(data.transactions, month)
     return base.filter((t) => {
       if (kind !== 'todo' && t.kind !== kind) return false
+      if (day && t.date !== day) return false
       if (filter && !onlyUnclassified && t.categoryId !== filter && rootId(t.categoryId, catMap) !== filter) return false
       if (query) {
         const hay = `${t.note ?? ''} ${t.merchant ?? ''} ${catMap.get(t.categoryId ?? '')?.name ?? ''} ${t.amount}`.toLowerCase()
@@ -35,7 +42,14 @@ export function Movimientos({ data, filter }: { data: AppData; filter?: string }
       }
       return true
     })
-  }, [data.transactions, month, q, kind, filter, catMap, onlyUnclassified])
+  }, [data.transactions, month, q, kind, filter, catMap, onlyUnclassified, day])
+  const bars = useMemo(() => {
+    const { days } = monthRange(month)
+    const per = Array.from({ length: days }, (_, i) => ({ d: `${month}-${String(i + 1).padStart(2, '0')}`, v: 0 }))
+    for (const t of monthTxs(data.transactions, month)) if (isBudgetExpense(t)) per[Number(t.date.slice(8, 10)) - 1].v += Math.max(0, net(t))
+    return per
+  }, [data.transactions, month])
+  const maxBar = Math.max(1, ...bars.map((b) => b.v))
   const unclassifiedCount = useMemo(() => data.transactions.filter((t) => t.kind === 'gasto' && !t.categoryId).length, [data.transactions])
 
   const groups = useMemo(() => {
@@ -103,11 +117,42 @@ export function Movimientos({ data, filter }: { data: AppData; filter?: string }
         )}
       </div>
 
-      <div className="mt-3 flex justify-between px-1 text-xs text-slate-500 dark:text-slate-400">
-        <span>{list.length} movimientos</span>
-        <span className="tabular-nums">
-          −{money(totalOut)} · +{money(totalIn)}
-        </span>
+      <div className="mt-3 rounded-[22px] bg-ios-card p-4">
+        <div className="flex items-end justify-between">
+          <div>
+            <p className="text-[13px] text-slate-500">{day ? `El ${Number(day.slice(8, 10))}` : 'Gastaste'}</p>
+            <p className="text-[28px] font-bold leading-none tabular-nums">
+              <CountUp value={totalOut} format={money} />
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[13px] text-slate-500">Entró</p>
+            <p className="text-[17px] font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">{money(totalIn)}</p>
+          </div>
+        </div>
+        {!onlyUnclassified && (
+          <div className="mt-3 flex h-14 items-end gap-[2px]">
+            {bars.map((b) => (
+              <button
+                key={b.d}
+                onClick={() => setDay(day === b.d ? null : b.d)}
+                className={cx('flex-1 rounded-t-[3px] transition-all duration-300', day === b.d ? 'bg-accent' : day ? 'bg-slate-300 dark:bg-slate-700' : 'bg-accent/60')}
+                style={{ height: `${Math.max(4, (b.v / maxBar) * 100)}%` }}
+                aria-label={`Día ${Number(b.d.slice(8, 10))}: ${money(b.v)}`}
+              />
+            ))}
+          </div>
+        )}
+        <p className="mt-2 flex items-center justify-between text-[12px] text-slate-500">
+          <span>{list.length} movimientos</span>
+          {day ? (
+            <button onClick={() => setDay(null)} className="font-semibold text-accent">
+              Ver todo el mes ✕
+            </button>
+          ) : (
+            <span>Tocá una barra para ver ese día</span>
+          )}
+        </p>
       </div>
 
       {groups.length === 0 ? (
