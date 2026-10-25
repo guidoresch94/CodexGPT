@@ -1,0 +1,123 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Estilo Apple: colores del sistema iOS y grises agrupados.
+ * Se sobrescriben las paletas de Tailwind para que toda la app herede el look
+ * sin tocar cada componente: slate = grises iOS, emerald = systemGreen,
+ * amber = systemOrange, red = systemRed, sky = systemBlue, violet = systemIndigo.
+ */
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --animate-up: up 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-fade: fade 0.2s ease-out;
+  --animate-pop: pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --color-accent: var(--accent);
+  --color-ios-bg: var(--ios-bg);
+  --color-ios-card: var(--ios-card);
+  --color-ios-fill: var(--ios-fill);
+  --color-ios-sep: var(--ios-sep);
+
+  --color-slate-50: #f2f2f7;
+  --color-slate-100: #ececf1;
+  --color-slate-200: #e3e3e8;
+  --color-slate-300: #c7c7cc;
+  --color-slate-400: #aeaeb2;
+  --color-slate-500: #8e8e93;
+  --color-slate-600: #636366;
+  --color-slate-700: #48484a;
+  --color-slate-800: #2c2c2e;
+  --color-slate-900: #1c1c1e;
+  --color-slate-950: #000000;
+
+  --color-emerald-300: #7ee2a0;
+  --color-emerald-400: #30d158;
+  --color-emerald-500: #34c759;
+  --color-emerald-600: #248a3d;
+  --color-emerald-700: #1d6f31;
+  --color-emerald-800: #155724;
+
+  --color-amber-300: #ffc46b;
+  --color-amber-400: #ff9f0a;
+  --color-amber-500: #ff9500;
+  --color-amber-600: #c93400;
+  --color-amber-700: #a32b00;
+  --color-amber-800: #7a2000;
+
+  --color-red-300: #ff8a84;
+  --color-red-400: #ff453a;
+  --color-red-500: #ff3b30;
+  --color-red-600: #d70015;
+  --color-red-700: #b00012;
+
+  --color-sky-300: #70b7ff;
+  --color-sky-400: #0a84ff;
+  --color-sky-500: #007aff;
+  --color-sky-600: #0062cc;
+  --color-sky-700: #004fa3;
+  --color-sky-800: #003d7f;
+
+  --color-violet-300: #a5a3ff;
+  --color-violet-500: #5856d6;
+  --color-violet-600: #3634a3;
+}
+
+:root {
+  --accent: #007aff;
+  --ios-bg: #f2f2f7;
+  --ios-card: #ffffff;
+  --ios-fill: rgba(118, 118, 128, 0.12);
+  --ios-sep: rgba(60, 60, 67, 0.18);
+  color-scheme: light;
+}
+.dark {
+  --accent: #0a84ff;
+  --ios-bg: #000000;
+  --ios-card: #1c1c1e;
+  --ios-fill: rgba(118, 118, 128, 0.24);
+  --ios-sep: rgba(84, 84, 88, 0.6);
+  color-scheme: dark;
+}
+
+@keyframes up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes pop {
+  0% { transform: scale(0.85); }
+  100% { transform: scale(1); }
+}
+
+html, body, #root { min-height: 100%; }
+body {
+  background: var(--ios-bg);
+  @apply text-slate-950 antialiased dark:text-white;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+  letter-spacing: -0.01em;
+}
+button { cursor: pointer; }
+.tabular-nums { font-variant-numeric: tabular-nums; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+@keyframes confetti {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(105vh) rotate(720deg); opacity: 0.6; }
+}
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@theme {
+  --animate-page: page-in 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.press { transition: transform .15s ease; }
+.press:active { transform: scale(0.96); }
