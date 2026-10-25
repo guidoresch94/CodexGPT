@@ -1,5 +1,5 @@
 import { ArrowLeft, Check, ChevronDown, FileSpreadsheet, Sparkles } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { go } from '../../app/router'
 import type { AppData } from '../../db/hooks'
 import { commitImport } from '../../db/importTx'
@@ -11,6 +11,7 @@ import type { Category } from '../../types'
 import { Button, Card, cx, List, PageHeader, SectionTitle } from '../../components/ui'
 import { useToast } from '../../components/Toast'
 import { XP } from '../../lib/game'
+import { aiClassifyGroups, aiErrorText, getAI, type GroupHint, type SampleFn } from '../../lib/ai'
 
 interface Group {
   key: string
@@ -35,6 +36,14 @@ export function Importar({ data }: { data: AppData }) {
   const [touched, setTouched] = useState<Set<string>>(new Set())
   const [forceImport, setForceImport] = useState<Set<string>>(new Set())
   const [showAuto, setShowAuto] = useState(false)
+  const [notes, setNotes] = useState<Record<string, string>>({})
+  const [hints, setHints] = useState<Record<string, GroupHint>>({})
+  const [ai, setAi] = useState<SampleFn | null>(null)
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiError, setAiError] = useState('')
+  useEffect(() => {
+    getAI().then((s) => setAi(() => s))
+  }, [])
   const [result, setResult] = useState<Awaited<ReturnType<typeof commitImport>> | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -90,10 +99,40 @@ export function Importar({ data }: { data: AppData }) {
     if (navigator.vibrate) navigator.vibrate(8)
   }
 
+  const askAI = async () => {
+    if (!ai) return
+    setAiBusy(true)
+    setAiError('')
+    try {
+      const res = await aiClassifyGroups(
+        ai,
+        pending.map((g) => ({ key: g.key, label: g.label, examples: g.items.slice(0, 3).map((i) => `${i.row.detail || i.row.concept} (${Math.abs(i.row.amount)} €)`), count: g.items.length, total: g.total, income: g.income })),
+        data,
+      )
+      setHints((h) => ({ ...h, ...res }))
+      setByKey((b) => {
+        const n = { ...b }
+        for (const [k, v] of Object.entries(res)) if (v.categoryId && !touched.has(k)) n[k] = v.categoryId
+        return n
+      })
+      setNotes((x) => {
+        const n = { ...x }
+        for (const [k, v] of Object.entries(res)) if (v.note && !n[k]) n[k] = v.note
+        return n
+      })
+      const n = Object.values(res).filter((v) => v.categoryId).length
+      toast({ text: `✨ La IA sugirió ${n} de ${pending.length}. Revisalos y aceptá.` })
+    } catch (e) {
+      setAiError(aiErrorText(e))
+    } finally {
+      setAiBusy(false)
+    }
+  }
+
   const run = async () => {
     setBusy(true)
     try {
-      const r = await commitImport(items, { byKey, forceImport }, data)
+      const r = await commitImport(items, { byKey, forceImport, notes }, data)
       setResult(r)
       setStage('done')
     } finally {
@@ -138,6 +177,15 @@ export function Importar({ data }: { data: AppData }) {
             ))}
           </List>
           {data.settings.lastImport && <p className="mt-3 px-4 text-[13px] text-slate-500">Última importación: {fmtDate(data.settings.lastImport)}</p>}
+          <button onClick={() => go('asistente')} className="mt-4 flex w-full items-center gap-3 rounded-[22px] bg-ios-card p-4 text-left active:opacity-80">
+            <span className="grid h-10 w-10 place-items-center rounded-[11px] bg-violet-500 text-white">
+              <Sparkles size={20} />
+            </span>
+            <span className="flex-1">
+              <span className="block text-[15px] font-semibold">¿Notas, mensajes o un ticket?</span>
+              <span className="block text-[13px] text-slate-500">Pegalos o sacales una foto y la IA los convierte en gastos clasificados</span>
+            </span>
+          </button>
         </>
       )}
 
@@ -185,9 +233,35 @@ export function Importar({ data }: { data: AppData }) {
               >
                 Enseñame estos
               </SectionTitle>
+              {ai && pending.length > 0 && (
+                <button
+                  onClick={askAI}
+                  disabled={aiBusy}
+                  className="mb-2.5 flex w-full items-center gap-3 rounded-[22px] bg-gradient-to-r from-violet-500 to-sky-500 p-4 text-left text-white active:opacity-90 disabled:opacity-70"
+                >
+                  <Sparkles size={22} className={cx(aiBusy && 'animate-pulse')} />
+                  <span className="flex-1">
+                    <span className="block text-[17px] font-semibold">{aiBusy ? 'Pensando…' : 'Clasificar con IA'}</span>
+                    <span className="block text-[13px] text-white/85">
+                      {aiBusy ? 'Mirando nombres, importes y conceptos' : `Que Claude sugiera los ${pending.length} comercios y te explique por qué`}
+                    </span>
+                  </span>
+                </button>
+              )}
+              {aiError && <p className="mb-2.5 px-2 text-[13px] text-red-500">{aiError}</p>}
               <div className="space-y-2.5">
                 {needsReview.map((g) => (
-                  <GroupCard key={g.key} g={g} data={data} value={chosen(g)} done={touched.has(g.key)} onPick={(c) => pick(g, c)} />
+                  <GroupCard
+                    key={g.key}
+                    g={g}
+                    data={data}
+                    value={chosen(g)}
+                    done={touched.has(g.key)}
+                    onPick={(c) => pick(g, c)}
+                    hint={hints[g.key]}
+                    note={notes[g.key] ?? ''}
+                    onNote={(n) => setNotes((x) => ({ ...x, [g.key]: n }))}
+                  />
                 ))}
               </div>
             </>
@@ -286,8 +360,32 @@ export function Importar({ data }: { data: AppData }) {
   )
 }
 
-function GroupCard({ g, data, value, done, onPick, compact }: { g: Group; data: AppData; value?: string; done: boolean; onPick: (c: string) => void; compact?: boolean }) {
+function GroupCard({
+  g,
+  data,
+  value,
+  done,
+  onPick,
+  compact,
+  hint,
+  note,
+  onNote,
+}: {
+  g: Group
+  data: AppData
+  value?: string
+  done: boolean
+  onPick: (c: string) => void
+  compact?: boolean
+  hint?: GroupHint
+  note?: string
+  onNote?: (n: string) => void
+}) {
   const [open, setOpen] = useState(!compact && !done && !value)
+  // Cuando llega la sugerencia de la IA, se muestra el «✓ Aceptar» en vez de la lista
+  useEffect(() => {
+    if (hint?.categoryId && !done) setOpen(false)
+  }, [hint, done])
   const cats = data.categories.filter((c) => !c.archived && (g.income ? c.type === 'ingreso' : c.type === 'fijo' || c.type === 'variable'))
   const current = value && value !== 'ignorar' ? data.catMap.get(value) : undefined
   const refund = g.items.some((i) => i.refund)
@@ -305,6 +403,7 @@ function GroupCard({ g, data, value, done, onPick, compact }: { g: Group; data: 
             {money0(Math.abs(g.total))}
             {current ? ` · ${current.name}` : value === 'ignorar' ? ' · ignorado' : ' · sin categoría'}
           </p>
+          {hint?.reason && <p className="mt-0.5 text-[12px] text-violet-600 dark:text-violet-300">✨ {hint.reason}</p>}
         </div>
         {done && !compact && <Check size={20} className="text-emerald-500" strokeWidth={3} />}
       </button>
@@ -317,6 +416,15 @@ function GroupCard({ g, data, value, done, onPick, compact }: { g: Group; data: 
             Cambiar
           </button>
         </div>
+      )}
+      {onNote && (open || note) && (
+        <input
+          value={note}
+          onChange={(e) => onNote(e.target.value)}
+          placeholder="Nota para estos movimientos (opcional)"
+          className="mt-3 w-full rounded-[10px] bg-ios-fill px-3 py-2 text-[15px] outline-none"
+          aria-label={`Nota para ${g.label}`}
+        />
       )}
       {open && (
         <div className="-mx-1 mt-3 flex flex-wrap gap-1.5">

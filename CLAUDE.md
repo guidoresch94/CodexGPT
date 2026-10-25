@@ -33,6 +33,7 @@ src/modules/    dashboard (+ revisión semanal), finanzas, habitos, objetivos (m
 - Importar extractos (`lib/importer.ts`, `lib/xlsx.ts` lector/escritor .xlsx propio con fflate, `db/importTx.ts`):
   reglas aprendidas (`settings.merchantRules`, clave = `merchantKey`) > diccionario > pistas (concepto del Bizum).
   `importHash` evita duplicar; gastos cargados a mano parecidos se unen. Bizum recibido = `refund` (resta del gasto).
+- IA (`lib/ai.ts`, capacidad `sample` del artefacto, con la cuenta de Claude de quien usa la app): «Cargar con IA» (texto libre, filas pegadas o foto de ticket → borradores que se revisan antes de guardar) y «Clasificar con IA» en la importación (sugerencia + motivo + nota por comercio). Fuera de Claude se oculta.
 - Juego (`lib/game.ts`): puntos derivados de los datos (no se guardan), niveles, racha de días activos, desafío semanal y logros.
   Las celebraciones recuerdan lo visto en `localStorage` (solo comodidad).
 - Se publica como artefacto de Claude: `npm run build:artifact` → `dist-artifact/mi-vida.html`; datos en `db` privado (`data/users/<id>`), ver `src/db/cloud.ts`.

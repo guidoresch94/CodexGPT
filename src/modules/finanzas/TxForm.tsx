@@ -7,6 +7,7 @@ import { habitsForCategory, linkModeOf } from '../../lib/habits'
 import { merchantKey } from '../../lib/importer'
 import { XP } from '../../lib/game'
 import type { TxDraft } from '../../app/actions'
+import { go } from '../../app/router'
 import { toISO, today } from '../../lib/dates'
 import { money, parseAmount, round2, uid } from '../../lib/format'
 import type { Transaction, TxKind } from '../../types'
@@ -185,6 +186,18 @@ export function TxForm({ data, initial, onClose }: Props) {
         ]}
       />
 
+      {!editing && (
+        <button
+          type="button"
+          onClick={() => {
+            onClose()
+            go('asistente')
+          }}
+          className="-mt-1 flex items-center justify-center gap-1.5 text-[13px] font-medium text-violet-500"
+        >
+          ✨ ¿Varios gastos o una foto del ticket? Contáselos a la IA
+        </button>
+      )}
       <div className="text-center">
         <div className={cx('text-5xl font-bold tabular-nums tracking-tight', value ? 'text-slate-900 dark:text-white' : 'text-slate-300 dark:text-slate-600')}>
           € {amount || '0'}

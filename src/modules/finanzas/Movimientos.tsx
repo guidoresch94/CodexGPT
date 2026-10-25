@@ -1,4 +1,4 @@
-import { Download, Search, Upload, Users, X } from 'lucide-react'
+import { Download, Search, Sparkles, Upload, Users, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useActions } from '../../app/actions'
 import { go } from '../../app/router'
@@ -58,6 +58,9 @@ export function Movimientos({ data, filter }: { data: AppData; filter?: string }
           <div className="mb-1.5 flex gap-2">
             <button onClick={exportXlsx} className="grid h-9 w-9 place-items-center rounded-full bg-ios-card text-accent" aria-label="Exportar a Excel" title="Exportar a Excel">
               <Download size={18} />
+            </button>
+            <button onClick={() => go('asistente')} className="grid h-9 w-9 place-items-center rounded-full bg-violet-500 text-white" aria-label="Cargar con IA" title="Cargar con IA">
+              <Sparkles size={17} />
             </button>
             <button onClick={() => go('importar')} className="flex h-9 items-center gap-1.5 rounded-full bg-accent px-3.5 text-[15px] font-semibold text-white" aria-label="Importar extracto">
               <Upload size={16} /> Importar

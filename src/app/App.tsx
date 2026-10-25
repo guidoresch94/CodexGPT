@@ -17,6 +17,7 @@ import { Habitos } from '../modules/habitos/Habitos'
 import { HabitLogForm } from '../modules/habitos/HabitLogForm'
 import { Review } from '../modules/dashboard/Review'
 import { Importar } from '../modules/finanzas/Importar'
+import { Asistente } from '../modules/finanzas/Asistente'
 import { Celebrate, useGame } from '../modules/dashboard/Game'
 import { Ajustes } from '../modules/ajustes/Ajustes'
 import { ActionsCtx, type TxDraft } from './actions'
@@ -79,6 +80,7 @@ function Shell() {
     categorias: <Categorias data={data} />,
     fijos: <Fijos data={data} />,
     importar: <Importar data={data} />,
+    asistente: <Asistente data={data} />,
   }
 
   return (
@@ -109,7 +111,7 @@ const NAV: { route: Route; label: string; icon: typeof Home }[] = [
 function BottomNav({ route, onAdd }: { route: Route; onAdd: () => void }) {
   const active = (r: Route) =>
     route === r ||
-    (r === 'movimientos' && (route === 'presupuesto' || route === 'categorias' || route === 'fijos' || route === 'importar')) ||
+    (r === 'movimientos' && (route === 'presupuesto' || route === 'categorias' || route === 'fijos' || route === 'importar' || route === 'asistente')) ||
     (r === 'inicio' && route === 'ajustes')
   const item = (n: (typeof NAV)[number]) => (
     <button
