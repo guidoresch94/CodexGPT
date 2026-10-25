@@ -45,6 +45,11 @@ export interface Transaction {
   paymentMethod?: string
   shared?: SharedInfo
   recurringId?: ID
+  /** Devolución (ej. Bizum recibido por una cena): resta del gasto de su categoría */
+  refund?: boolean
+  /** Texto original del banco y huella para no importar dos veces */
+  merchant?: string
+  importHash?: string
   sample?: boolean
   createdAt: number
 }
@@ -88,6 +93,10 @@ export interface Settings {
   paymentMethods: string[]
   /** Versión de datos por defecto ya añadidos (2 = hábitos y objetivos) */
   dataVersion?: number
+  /** Comercio normalizado → categoría (o 'ignorar'), aprendido al clasificar */
+  merchantRules?: Record<string, string>
+  /** Fecha (AAAA-MM-DD) del último extracto importado */
+  lastImport?: string
 }
 
 export interface Backup {

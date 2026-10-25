@@ -2,6 +2,7 @@ import { allTables, db } from './schema'
 import type { Backup, Category, Transaction } from '../types'
 import { net } from '../lib/calc'
 import { capability } from '../lib/platform'
+import { writeXlsx } from '../lib/xlsx'
 
 export async function exportBackup(): Promise<Backup> {
   const [settings, categories, transactions, recurrings, funds, habits, habitLogs, goals, ideas, reviews] = await Promise.all(allTables().map((t) => t.toArray()))
@@ -70,11 +71,11 @@ export function transactionsCsv(txs: Transaction[], cats: Map<string, Category>,
 }
 
 interface Downloads {
-  save(r: { filename: string; data: string }): Promise<unknown>
+  save(r: { filename: string; data: string | Uint8Array }): Promise<unknown>
 }
 
 /** Descarga un archivo (en el visor de Claude, a través de su diálogo de guardar) */
-export async function download(filename: string, content: string, type: string) {
+export async function download(filename: string, content: string | Uint8Array, type: string) {
   const cap = await capability<Downloads>('downloads')
   if (cap) {
     try {
@@ -84,7 +85,7 @@ export async function download(filename: string, content: string, type: string) 
       return false
     }
   }
-  const blob = new Blob([content], { type })
+  const blob = new Blob([content as BlobPart], { type })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -92,4 +93,23 @@ export async function download(filename: string, content: string, type: string) 
   a.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
   return true
+}
+
+/** Excel (.xlsx) de movimientos ya clasificados */
+export function transactionsXlsx(txs: Transaction[], cats: Map<string, Category>, fundName: (id?: string) => string) {
+  const rows: (string | number)[][] = [['Fecha', 'Concepto del banco', 'Nota', 'Categoría', 'Tipo', 'Importe', 'Ahorro', 'Método de pago']]
+  for (const t of [...txs].sort((a, b) => a.date.localeCompare(b.date))) {
+    const signed = t.kind === 'ingreso' ? t.amount : t.kind === 'transferencia' ? -t.amount : -net(t)
+    rows.push([
+      t.date.split('-').reverse().join('/'),
+      t.merchant ?? '',
+      t.note ?? '',
+      cats.get(t.categoryId ?? '')?.name ?? (t.kind === 'transferencia' ? 'Ahorro' : 'Sin clasificar'),
+      t.refund ? 'devolución' : t.kind,
+      Math.round(signed * 100) / 100,
+      fundName(t.fundId),
+      t.paymentMethod ?? '',
+    ])
+  }
+  return writeXlsx(rows)
 }

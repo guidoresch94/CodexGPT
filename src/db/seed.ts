@@ -14,7 +14,7 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'claro',
   name: 'Guido',
   paymentMethods: ['Tarjeta', 'Bizum', 'Efectivo', 'Domiciliación'],
-  dataVersion: 3,
+  dataVersion: 4,
 }
 
 type CatSeed = Omit<Category, 'archived' | 'order'>
@@ -184,6 +184,7 @@ export async function seedIfEmpty() {
 export async function ensureUpgrades() {
   await ensureV2()
   await ensureV3()
+  await ensureV4()
 }
 
 async function ensureV2() {
@@ -250,4 +251,19 @@ async function ensureV3() {
     }
     await db.settings.update('main', { dataVersion: 3 })
   })
+}
+
+/**
+ * v4: un hábito "sin X" (tabaco, fumar…) enlazado en modo "suma" contaba cada compra
+ * como un día cumplido. Se corrige a "dejarlo": cada día cuenta solo y la compra lo corta.
+ */
+async function ensureV4() {
+  const s = await db.settings.get('main')
+  if (!s || (s.dataVersion ?? 1) >= 4) return
+  for (const h of await db.habits.toArray()) {
+    const quitting = /\bsin\b|dejar|no fumar|tabaco|fumar|cigarr/i.test(h.name)
+    if (h.unit === 'si_no' && h.linkedCategoryId && quitting && (h.linkMode !== 'rompe' || !h.auto))
+      await db.habits.update(h.id, { linkMode: 'rompe', auto: true, since: h.since ?? today() })
+  }
+  await db.settings.update('main', { dataVersion: 4 })
 }

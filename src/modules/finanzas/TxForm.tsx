@@ -4,6 +4,8 @@ import { db } from '../../db/schema'
 import type { AppData } from '../../db/hooks'
 import { usageRank } from '../../lib/calc'
 import { habitsForCategory, linkModeOf } from '../../lib/habits'
+import { merchantKey } from '../../lib/importer'
+import { XP } from '../../lib/game'
 import type { TxDraft } from '../../app/actions'
 import { toISO, today } from '../../lib/dates'
 import { money, parseAmount, round2, uid } from '../../lib/format'
@@ -129,14 +131,24 @@ export function TxForm({ data, initial, onClose }: Props) {
       shared: kind === 'gasto' && shared && share >= 0 && share < value ? { total: round2(value), myShare: round2(share) } : undefined,
       recurringId: initial?.recurringId,
     }
-    await db.transactions.put(tx)
+    await db.transactions.put({ ...tx, merchant: initial?.merchant, importHash: initial?.importHash, refund: initial?.refund })
     await syncHabitLogs(tx)
     onClose()
+    // Movimiento del banco recategorizado: aprendo el comercio y lo aplico a los parecidos sin clasificar
+    if (editing && initial?.merchant && tx.categoryId && tx.categoryId !== initial.categoryId) {
+      const [concept, ...rest] = initial.merchant.split(' · ')
+      const key = merchantKey({ concept, detail: rest.join(' · '), date: tx.date, amount: tx.amount })
+      const similar = data.transactions.filter((t) => t.id !== tx.id && t.merchant && !t.categoryId && merchantKeyOf(t) === key)
+      await db.transactions.bulkPut(similar.map((t) => ({ ...t, categoryId: tx.categoryId })))
+      await db.settings.update('main', { merchantRules: { ...(data.settings.merchantRules ?? {}), [key]: tx.categoryId! } })
+      toast({ text: similar.length ? `Aprendido · apliqué a ${similar.length} parecidos · +${XP.teach} pts` : `Aprendido: la próxima vez lo clasifico solo · +${XP.teach} pts` })
+      return
+    }
     if (!editing) {
       const label = kind === 'gasto' ? 'Gasto' : kind === 'ingreso' ? 'Ingreso' : 'Ahorro'
       const counted = countable.filter((h) => !skipHabits.has(h.id) && !alreadyLinked.has(h.id))
       const extra = counted.length ? ` · ${counted.map((h) => h.icon).join(' ')} +1` : ''
-      toast({ text: `${label} de ${money(tx.amount)} guardado${extra}`, action: { label: 'Deshacer', run: () => deleteTx(tx.id) } })
+      toast({ text: `${label} de ${money(tx.amount)} guardado${extra} · +${XP.manualTx} pts`, action: { label: 'Deshacer', run: () => deleteTx(tx.id) } })
     }
   }
 
@@ -177,6 +189,7 @@ export function TxForm({ data, initial, onClose }: Props) {
         <div className={cx('text-5xl font-bold tabular-nums tracking-tight', value ? 'text-slate-900 dark:text-white' : 'text-slate-300 dark:text-slate-600')}>
           € {amount || '0'}
         </div>
+        {initial?.merchant && <div className="mt-1 truncate text-[13px] text-slate-500">🏦 {initial.merchant}</div>}
         {shared && kind === 'gasto' && value > 0 && (
           <div className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">Mi parte: {money(parseAmount(myShare))}</div>
         )}
@@ -351,4 +364,9 @@ async function deleteTx(id: string) {
   const logs = await db.habitLogs.filter((l) => l.txId === id).toArray()
   await db.habitLogs.bulkDelete(logs.map((l) => l.id))
   await db.transactions.delete(id)
+}
+
+const merchantKeyOf = (t: Transaction) => {
+  const [concept, ...rest] = (t.merchant ?? '').split(' · ')
+  return merchantKey({ concept, detail: rest.join(' · '), date: t.date, amount: t.amount })
 }

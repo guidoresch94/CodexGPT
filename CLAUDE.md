@@ -12,15 +12,15 @@ App personal de Guido (Barcelona). Requisitos completos en [`docs/PRD.md`](docs/
 ```
 src/app/        App, router por hash, navegación, contexto de acciones (openTx)
 src/db/         schema Dexie, seed (datos reales + ejemplo), hooks (useData), backup JSON/CSV
-src/lib/        dates (lunes), format (€), calc (presupuesto, semana, proyección, huchas, avisos)
+src/lib/        dates (lunes), format (€), calc (presupuesto, proyección, ahorros, avisos), habits, importer, xlsx, game
 src/components/ UI común: Card, Sheet, ProgressBar, NumPad, Pickers, Toast
-src/modules/    dashboard (+ revisión semanal), finanzas, habitos, objetivos (metas: objetivos, huchas, ideas), ajustes
+src/modules/    dashboard (+ revisión semanal), finanzas, habitos, objetivos (metas: objetivos, ahorros, ideas), ajustes
 ```
 
 ## Reglas del dominio
 - Gasto compartido: cuenta solo `shared.myShare` (`net()` en `lib/calc.ts`).
-- Gasto con `fundId` = pagado desde una hucha: NO cuenta en el presupuesto mensual, resta de la hucha.
-- `transferencia` + `fundId` = aportación a hucha (ahorro).
+- Gasto con `fundId` = pagado desde un ahorro: NO cuenta en el presupuesto mensual, resta de la hucha.
+- `transferencia` + `fundId` = aportación a un ahorro.
 - Subcategorías suman en su categoría raíz.
 - Datos de ejemplo marcados con `sample: true` (borrables desde Ajustes).
 - "Para el día a día" = presupuesto de categorías raíz `variable` − gasto; ritmo ideal lineal en el mes (`monthPace`).
@@ -30,6 +30,11 @@ src/modules/    dashboard (+ revisión semanal), finanzas, habitos, objetivos (m
   - `rompe` + `auto`: hábito "sin X" (tabaco); cada día desde `since` cuenta solo, salvo gasto en la categoría o recaída (`value: -1`). `quitSavings` calcula lo que no gastaste.
   - Usar siempre `data.byHabit` (registros efectivos), no `habitLogs` crudos, para progreso y rachas.
 - Migraciones de datos en `seed.ts` (`ensureUpgrades`, `dataVersion`).
+- Importar extractos (`lib/importer.ts`, `lib/xlsx.ts` lector/escritor .xlsx propio con fflate, `db/importTx.ts`):
+  reglas aprendidas (`settings.merchantRules`, clave = `merchantKey`) > diccionario > pistas (concepto del Bizum).
+  `importHash` evita duplicar; gastos cargados a mano parecidos se unen. Bizum recibido = `refund` (resta del gasto).
+- Juego (`lib/game.ts`): puntos derivados de los datos (no se guardan), niveles, racha de días activos, desafío semanal y logros.
+  Las celebraciones recuerdan lo visto en `localStorage` (solo comodidad).
 - Se publica como artefacto de Claude: `npm run build:artifact` → `dist-artifact/mi-vida.html`; datos en `db` privado (`data/users/<id>`), ver `src/db/cloud.ts`.
 
 ## Comandos

@@ -3,7 +3,7 @@ import { dayInMonth, daysBetween, monthKey, monthRange, shiftMonth, today } from
 import { money0 } from './format'
 
 /** Lo que de verdad me cuesta un gasto (si es compartido, solo mi parte) */
-export const net = (t: Transaction) => (t.shared ? t.shared.myShare : t.amount)
+export const net = (t: Transaction) => (t.refund ? -t.amount : t.shared ? t.shared.myShare : t.amount)
 
 /** Gasto que cuenta para el presupuesto mensual (no los pagados desde una hucha) */
 export const isBudgetExpense = (t: Transaction) => t.kind === 'gasto' && !t.fundId

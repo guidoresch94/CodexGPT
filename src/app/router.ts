@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 
-export type Route = 'inicio' | 'movimientos' | 'presupuesto' | 'habitos' | 'metas' | 'ajustes' | 'categorias' | 'fijos'
+export type Route = 'inicio' | 'movimientos' | 'presupuesto' | 'habitos' | 'metas' | 'ajustes' | 'categorias' | 'fijos' | 'importar'
 
 interface State {
   route: Route

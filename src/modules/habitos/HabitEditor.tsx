@@ -110,11 +110,13 @@ export function HabitEditor({ data, initial, onDone }: { data: AppData; initial:
           value={mode}
           onChange={setMode}
           options={[
-            { value: 'suma', label: 'Cada gasto suma 1' },
-            { value: 'rompe', label: 'Un gasto corta la racha' },
+            { value: 'suma', label: 'Quiero hacerlo más' },
+            { value: 'rompe', label: 'Quiero dejarlo' },
           ]}
         />
       )}
+      {linked && mode === 'suma' && <p className="px-1 text-[13px] text-slate-500">Cada gasto en esa categoría (un pádel, una clase…) cuenta como una vez. Las cuotas domiciliadas no.</p>}
+      {linked && mode === 'rompe' && unit !== 'si_no' && <p className="px-1 text-[13px] text-slate-500">Para dejar algo, elegí «Sí / No» arriba: cada día cuenta solo y un gasto lo corta.</p>}
       {linked && mode === 'rompe' && unit === 'si_no' && (
         <p className="px-1 text-[13px] text-slate-500">Cada día cuenta solo como cumplido. Si gastás en esa categoría o anotás una recaída, la racha vuelve a cero.</p>
       )}

@@ -16,6 +16,8 @@ import { Metas } from '../modules/objetivos/Metas'
 import { Habitos } from '../modules/habitos/Habitos'
 import { HabitLogForm } from '../modules/habitos/HabitLogForm'
 import { Review } from '../modules/dashboard/Review'
+import { Importar } from '../modules/finanzas/Importar'
+import { Celebrate, useGame } from '../modules/dashboard/Game'
 import { Ajustes } from '../modules/ajustes/Ajustes'
 import { ActionsCtx, type TxDraft } from './actions'
 import { go, useRoute, type Route } from './router'
@@ -76,12 +78,14 @@ function Shell() {
     ajustes: <Ajustes data={data} />,
     categorias: <Categorias data={data} />,
     fijos: <Fijos data={data} />,
+    importar: <Importar data={data} />,
   }
 
   return (
     <ActionsCtx.Provider value={{ openTx, openHabitLog, openReview }}>
       <main className="mx-auto min-h-dvh max-w-lg px-4 pb-28 pt-[max(env(safe-area-inset-top),8px)]">{pages[route]}</main>
       <BottomNav route={route} onAdd={() => openTx()} />
+      <GameLayer data={data} />
       <Sheet open={!!tx} onClose={closeTx} title={tx?.id ? 'Editar movimiento' : 'Nuevo movimiento'} full>
         {tx && <TxForm key={tx.id ?? 'new'} data={data} initial={tx} onClose={closeTx} />}
       </Sheet>
@@ -105,7 +109,7 @@ const NAV: { route: Route; label: string; icon: typeof Home }[] = [
 function BottomNav({ route, onAdd }: { route: Route; onAdd: () => void }) {
   const active = (r: Route) =>
     route === r ||
-    (r === 'movimientos' && (route === 'presupuesto' || route === 'categorias' || route === 'fijos')) ||
+    (r === 'movimientos' && (route === 'presupuesto' || route === 'categorias' || route === 'fijos' || route === 'importar')) ||
     (r === 'inicio' && route === 'ajustes')
   const item = (n: (typeof NAV)[number]) => (
     <button
@@ -134,4 +138,9 @@ function BottomNav({ route, onAdd }: { route: Route; onAdd: () => void }) {
       </div>
     </nav>
   )
+}
+
+function GameLayer({ data }: { data: NonNullable<ReturnType<typeof useData>> }) {
+  const g = useGame(data)
+  return <Celebrate g={g} />
 }

@@ -1,4 +1,4 @@
-import { Check, ChevronRight, Settings as Gear } from 'lucide-react'
+import { Check, Settings as Gear } from 'lucide-react'
 import { useMemo } from 'react'
 import { Area, AreaChart, Line, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { go } from '../../app/router'
@@ -15,6 +15,7 @@ import { Card, CatIcon, cx, List, PageHeader, ProgressBar, SectionTitle } from '
 import { useHabitTap } from '../habitos/useHabitTap'
 import { goalProgress } from '../objetivos/Objetivos'
 import { currentFocus, reviewDue } from './Review'
+import { GameCard, TodayTasks, useGame } from './Game'
 
 export function Dashboard({ data }: { data: AppData }) {
   const { settings, transactions, categories, recurrings, funds } = data
@@ -26,6 +27,7 @@ export function Dashboard({ data }: { data: AppData }) {
   const score = weekScore(data.habits, data.byHabit, moneyScore(pace))
   const notes = useMemo(() => [...achievements(data, pace.noSpendDays), ...alerts(transactions, categories, recurrings, settings)], [data, pace.noSpendDays, transactions, categories, recurrings, settings])
   const savingGoal = plan.free > 0 ? plan.free : plan.needed
+  const game = useGame(data)
 
 
   return (
@@ -40,7 +42,9 @@ export function Dashboard({ data }: { data: AppData }) {
         }
       />
 
-      <Card onClick={() => go('habitos')} className="flex items-center gap-5">
+      <GameCard g={game} />
+
+      <Card onClick={() => go('habitos')} className="mt-3 flex items-center gap-5">
         <Rings
           size={112}
           rings={[
@@ -57,6 +61,7 @@ export function Dashboard({ data }: { data: AppData }) {
       </Card>
 
       <FocusCard data={data} />
+      <TodayTasks data={data} />
 
       <SectionTitle action={<button onClick={() => go('presupuesto')} className="text-[15px] text-accent">Presupuesto</button>}>Para el día a día</SectionTitle>
       <SpendCard pace={pace} />
@@ -229,17 +234,8 @@ function FocusCard({ data }: { data: AppData }) {
   const { openReview } = useActions()
   const { due } = reviewDue(data)
   const focus = currentFocus(data)
-  if (due)
-    return (
-      <button onClick={openReview} className="mt-3 flex w-full items-center gap-3 rounded-[22px] bg-ios-card p-4 text-left active:opacity-80">
-        <span className="grid h-10 w-10 place-items-center rounded-[11px] bg-violet-500 text-xl text-white">🧭</span>
-        <span className="flex-1">
-          <span className="block text-[15px] font-semibold">Revisión semanal</span>
-          <span className="block text-[13px] text-slate-500">5 minutos para repasar la semana y elegir tu foco.</span>
-        </span>
-        <ChevronRight size={18} className="text-slate-400" />
-      </button>
-    )
+  // La revisión pendiente aparece en «Para hoy»; acá solo se muestra el foco elegido
+  if (due) return null
   if (!focus?.focus) return null
   return (
     <button onClick={openReview} className="mt-3 flex w-full items-center gap-3 rounded-[22px] bg-ios-card p-4 text-left active:opacity-80">
